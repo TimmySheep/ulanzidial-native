@@ -257,6 +257,64 @@ struct SettingsView: View {
 
                 Divider()
 
+                HStack(spacing: 12) {
+                    Text("设备")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 84, alignment: .leading)
+
+                    Toggle("触感反馈", isOn: Binding(
+                        get: { link.hapticsEnabled ?? true },
+                        set: { link.setHaptics($0) }
+                    ))
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+
+                    Text("自动休眠")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 8)
+
+                    Picker("", selection: Binding(
+                        get: { link.sleepSeconds ?? 7200 },
+                        set: { link.setSleepSeconds($0) }
+                    )) {
+                        Text("不休眠").tag(0)
+                        Text("1 小时").tag(3600)
+                        Text("2 小时").tag(7200)
+                        Text("3 小时").tag(10800)
+                        Text("4 小时").tag(14400)
+                    }
+                    .labelsHidden()
+                    .controlSize(.small)
+                    .frame(width: 110)
+
+                    Spacer()
+                }
+
+                Text("触感与休眠时间写进设备本身，断电后仍然保留；未连接设备时不可改。")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 96)
+
+                Divider()
+
+                HStack(spacing: 12) {
+                    Text("关于")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 84, alignment: .leading)
+                    Text("版本 \(UpdateChecker.currentVersion)")
+                        .font(.system(size: 12))
+                    Button("检查更新") {
+                        UpdateChecker.check(userInitiated: true)
+                    }
+                    .controlSize(.small)
+                    Spacer()
+                }
+
+                Divider()
+
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 12) {
                         Text("应用规则")

@@ -75,7 +75,7 @@ struct DeviceTopView: View {
                 chip(.sideUpperRight, x: x0 + bw + chipW / 2 + 14, y: y0 + bh * 0.37, width: chipW)
                 chip(.sideLowerRight, x: x0 + bw + chipW / 2 + 14, y: y0 + bh * 0.64, width: chipW)
 
-                chip(.knobClick, x: cx, y: cy - bw * 0.27 - 24, width: chipW + 6)
+                chip(.knobClick, x: cx, y: cy + bw * 0.27 + 22, width: chipW + 6)
             }
         }
     }

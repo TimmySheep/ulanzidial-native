@@ -37,6 +37,10 @@ Ulanzi D100H 是「3 个顶键 + 4 个侧键 + 一个旋钮」的剪辑控制器
 - **完全隐形**：不占 Dock、不占菜单栏，`⌥⌘D`（可自定义）呼出设置窗口
 - **开机自启**：Apple 官方 `SMAppService`
 - **电量显示**：走标准 GATT 电量特征（0x2A19），不依赖厂商不定期上报
+- **设备设置**：触感反馈开关、自动休眠时间，直接写进设备（断电后保留）
+- **检查更新**：启动时读取 `timhuang.net` 上的版本清单，有新版本时提示并跳转下载页
+
+![主界面](docs/assets/shot-main.png)
 
 ### 和官方软件的差别
 
@@ -113,6 +117,10 @@ This project rewrites only the layer that matters, using Apple's own frameworks:
 - **Completely invisible**: no Dock icon, no menu bar item; `⌥⌘D` (configurable) opens settings
 - **Launch at login** via Apple's `SMAppService`
 - **Battery level** read from the standard GATT characteristic (0x2A19) instead of vendor pushes
+- **Device settings**: haptics on/off and auto-sleep timeout, written to the device (survives power cycles)
+- **Update check**: reads a version feed on `timhuang.net` at launch and offers a download link when newer
+
+![Main window](docs/assets/shot-main.png)
 
 ### How it differs from the official app
 

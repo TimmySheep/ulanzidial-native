@@ -126,6 +126,9 @@ final class DialLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBPe
     @Published private(set) var stateText = "启动中"
     @Published private(set) var isOnline = false
     @Published private(set) var batteryText = "—"
+    /// 设备设置（从设备读回）
+    @Published private(set) var hapticsEnabled: Bool? = nil
+    @Published private(set) var sleepSeconds: Int? = nil
     func start() {
         if UserDefaults.standard.object(forKey: "lastBattery") != nil {
             batteryText = "\(UserDefaults.standard.integer(forKey: "lastBattery"))%"
@@ -278,6 +281,7 @@ final class DialLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBPe
             isOnline = true
             stateText = "在线模式"
             sendHeartbeat()
+            requestDeviceSettings()
             hbTimer?.invalidate()
             hbTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
                 self?.sendHeartbeat()
@@ -295,6 +299,34 @@ final class DialLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBPe
         var plain = [UInt8](repeating: 0, count: 20)
         plain[0] = 0x06; plain[1] = 0x01; plain[2] = 0x23; plain[3] = 0x00; plain[4] = 0x01
         p.writeValue(Data(TEA.encrypt(plain)), for: ch, type: .withoutResponse)
+    }
+
+    // MARK: 设备设置（触感 / 休眠）
+
+    /// 发送厂商命令：明文前缀自动补零到 20 字节后加密
+    private func sendCommand(_ prefix: [UInt8]) {
+        guard let p = peripheral, let ch = writeCh else { return }
+        var plain = [UInt8](repeating: 0, count: 20)
+        for (index, byte) in prefix.enumerated() where index < 20 { plain[index] = byte }
+        p.writeValue(Data(TEA.encrypt(plain)), for: ch, type: .withoutResponse)
+        logLine("tx \(prefix.map { String(format: "%02x", $0) }.joined(separator: " "))")
+    }
+
+    func setHaptics(_ on: Bool) {
+        sendCommand([0x01, 0x06, 0x40, 0x04, on ? 0xff : 0x00])
+        hapticsEnabled = on
+    }
+
+    func setSleepSeconds(_ seconds: Int) {
+        let value = UInt16(max(0, min(seconds, 65_535)))
+        sendCommand([0x01, 0x01, 0x42, 0x02, UInt8(value & 0xff), UInt8(value >> 8)])
+        sleepSeconds = seconds
+    }
+
+    /// 连上后读一次当前设备设置
+    func requestDeviceSettings() {
+        sendCommand([0x01, 0x06, 0x40, 0x01])
+        sendCommand([0x01, 0x01, 0x42, 0x01])
     }
 
     func peripheral(_ p: CBPeripheral, didUpdateValueFor ch: CBCharacteristic, error: Error?) {
@@ -329,6 +361,16 @@ final class DialLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBPe
             batteryText = "\(pct)%"
             UserDefaults.standard.set(pct, forKey: "lastBattery")
             logLine("battery \(pct)%")
+        } else if m[0] == 0x01 && m[1] == 0x06 && m[2] == 0x40 && m[3] == 0x11 {
+            let on = m.count > 4 && m[4] != 0x00
+            hapticsEnabled = on
+            logLine("device haptics = \(on ? "on" : "off")")
+        } else if m[0] == 0x01 && m[1] == 0x01 && m[2] == 0x42 && m[3] == 0x11 {
+            let lo = UInt16(m.count > 4 ? m[4] : 0)
+            let hi = UInt16(m.count > 5 ? m[5] : 0)
+            let seconds = Int(lo | (hi << 8))
+            sleepSeconds = seconds
+            logLine("device sleep = \(seconds)s")
         }
     }
 }

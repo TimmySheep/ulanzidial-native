@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UlanziDial Native — 更新日志</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; padding: 48px 24px; font: 16px/1.65 -apple-system, "PingFang SC", sans-serif;
+         background: #f5f5f8; color: #16171c; }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 28px; letter-spacing: -.02em; margin: 0 0 8px; }
+  .sub { color: #5d6070; margin-bottom: 32px; }
+  article { background: #fff; border: 1px solid rgba(0,0,0,.07); border-radius: 14px;
+            padding: 22px 24px; margin-bottom: 16px; box-shadow: 0 12px 32px -28px rgba(30,20,90,.4); }
+  h2 { font-size: 18px; margin: 0 0 4px; }
+  time { font-size: 13px; color: #8a8d9a; }
+  ul { margin: 12px 0 0; padding-left: 20px; color: #3a3c48; }
+  li { margin: 4px 0; }
+  a { color: #342fd0; }
+  footer { margin-top: 32px; font-size: 13px; color: #8a8d9a; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #131418; color: #e8e9ef; }
+    article { background: #1c1d24; border-color: #2a2b34; }
+    ul { color: #c2c4d0; }
+    a { color: #9b95ff; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>UlanziDial Native</h1>
+  <p class="sub">更新日志 · <a href="version.json">version.json</a> · <a href="https://github.com/TimmySheep/ulanzidial-native">GitHub</a></p>
+
+  <article>
+    <h2>0.2.0</h2>
+    <time>2026-11-06</time>
+    <ul>
+      <li>新增：多项操作（按顺序执行，每步可设等待时间）</li>
+      <li>新增：多套配置，可按前台 App 自动切换</li>
+      <li>新增：触感反馈与自动休眠设置（写入设备，断电保留）</li>
+      <li>新增：检查更新（读取本站版本清单，有新版本时提示）</li>
+      <li>修复：电量一直显示横线（改用标准 GATT 电量特征 0x2A19）</li>
+      <li>修复：无法录制 ⌥⌘Tab 等被系统预留的快捷键（改用 CGEventTap）</li>
+      <li>界面：原生液态玻璃效果、设备俯视图、键位标签不再重叠</li>
+      <li>改名：UlanziDialLite → UlanziDial Native</li>
+    </ul>
+  </article>
+
+  <article>
+    <h2>0.1</h2>
+    <time>2026-11-05</time>
+    <ul>
+      <li>首个版本：12 个槽位绑定、8 类动作、Developer ID 签名与公证</li>
+    </ul>
+  </article>
+
+  <footer>
+    非官方项目，与 Ulanzi（深圳优篮子科技）无关。
+  </footer>
+</div>
+</body>
+</html>

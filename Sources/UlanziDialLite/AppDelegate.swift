@@ -19,6 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotKeyCenter.shared.onPress = { [weak self] in self?.showSettings() }
         HotKeyCenter.shared.apply(settings: settings)
 
+        UpdateChecker.checkOnLaunch()
+
         // 前台 App 变化 → 按规则切换配置
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
