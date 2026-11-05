@@ -105,7 +105,7 @@ extension Array where Element == UInt8 {
 
 // MARK: - 设备连接
 
-final class DialLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
+final class DialLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     static let svcUUID = CBUUID(string: "00001971-0000-1000-8000-00805F9B34FB")
     static let writeUUID = CBUUID(string: "0000FD01-0000-1000-8000-00805F9B34FB")
     static let notifyUUID = CBUUID(string: "0000FD00-0000-1000-8000-00805F9B34FB")
@@ -120,11 +120,13 @@ final class DialLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     private var scanTimer: Timer?
     private var wantsReconnect = true
 
-    private(set) var stateText = "启动中"
-    private(set) var isOnline = false
-    private(set) var batteryText = "—"
-
+    @Published private(set) var stateText = "启动中"
+    @Published private(set) var isOnline = false
+    @Published private(set) var batteryText = "—"
     func start() {
+        if UserDefaults.standard.object(forKey: "lastBattery") != nil {
+            batteryText = "\(UserDefaults.standard.integer(forKey: "lastBattery"))%"
+        }
         central = CBCentralManager(delegate: self, queue: nil, options: [CBCentralManagerOptionShowPowerAlertKey: true])
     }
 
@@ -299,8 +301,9 @@ final class DialLink: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
                 onEvent?(control, isDown)
             }
         } else if m[0] == 0x0b && m[1] == 0x7b {
-            let pct = m.count > 5 ? m[5] : 0
+            let pct = m.count > 5 ? Int(m[5]) : 0
             batteryText = "\(pct)%"
+            UserDefaults.standard.set(pct, forKey: "lastBattery")
             logLine("battery \(pct)%")
         }
     }

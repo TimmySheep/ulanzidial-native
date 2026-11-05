@@ -3,6 +3,7 @@ import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let store = BindingStore()
+    let settings = AppSettings()
     let link = DialLink()
     private var settingsWindow: NSWindow?
 
@@ -16,7 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         link.start()
 
         HotKeyCenter.shared.onPress = { [weak self] in self?.showSettings() }
-        HotKeyCenter.shared.register()
+        HotKeyCenter.shared.apply(settings: settings)
 
         // 首次运行弹一次设置窗口，之后（含开机自启）完全静默
         if !UserDefaults.standard.bool(forKey: "didLaunchBefore") {
@@ -54,13 +55,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 780, height: 760),
+            contentRect: NSRect(x: 0, y: 0, width: 1000, height: 720),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Ulanzi Dial Lite"
-        window.contentView = NSHostingView(rootView: SettingsView(store: store, link: link))
+        window.contentView = NSHostingView(rootView: SettingsView(store: store, settings: settings, link: link))
         window.isReleasedWhenClosed = false
         window.center()
         window.makeKeyAndOrderFront(nil)

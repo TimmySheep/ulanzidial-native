@@ -1,380 +1,247 @@
 import AppKit
+import Carbon.HIToolbox
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @ObservedObject var store: BindingStore
-    let link: DialLink
+    @ObservedObject var settings: AppSettings
+    @ObservedObject var link: DialLink
 
-    @State private var recording: Control?
+    enum Selection: Hashable {
+        case control(Control)
+        case general
+    }
+
+    @State private var selection: Selection = .control(.topLeft)
+    @State private var editing: Control?
+    @State private var recordingHotKey = false
     @State private var monitor: Any?
     @State private var trusted = Actions.isAccessibilityGranted()
     @State private var loginEnabled = LoginItem.isEnabled
     @State private var loginNote: String?
-    @State private var tick = 0
 
     var body: some View {
         VStack(spacing: 0) {
-            header
+            topBar
             Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    section("顶部三键", subtitle: "设备正面朝上，从左到右", controls: Control.topRow)
-                    section("侧键", subtitle: "左侧上/下、右侧上/下", controls: Control.sideRow)
-                    section("旋钮", subtitle: "旋转每转一格触发一次；按住旋转可单独绑定", controls: Control.knobGroup)
-                }
-                .padding(20)
+
+            if selection == .general {
+                generalPane
+            } else {
+                DeviceTopView(store: store, selection: $selection, editing: $editing)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(nsColor: .underPageBackgroundColor).opacity(0.35))
             }
-            Divider()
-            footer
         }
-        .frame(minWidth: 760, minHeight: 720)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear { refreshState() }
+        .frame(minWidth: 900, minHeight: 620)
         .onDisappear { stopMonitor() }
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
             trusted = Actions.isAccessibilityGranted()
             loginEnabled = LoginItem.isEnabled
-            tick += 1
         }
     }
 
-    // MARK: 顶部
+    // MARK: 顶栏
 
-    private var header: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "dial.medium")
-                .font(.system(size: 30, weight: .light))
-                .foregroundStyle(link.isOnline ? Color.accentColor : Color.secondary)
+    private var topBar: some View {
+        HStack(spacing: 12) {
+            Text("Ulanzi Dial").font(.system(size: 17, weight: .semibold))
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Ulanzi Dial Lite").font(.title3.weight(.semibold))
-                HStack(spacing: 10) {
-                    Label(link.stateText, systemImage: link.isOnline ? "dot.radiowaves.left.and.right" : "bolt.horizontal.circle")
-                        .foregroundStyle(link.isOnline ? Color.green : Color.secondary)
-                    Text("电量 \(link.batteryText)").foregroundStyle(.secondary)
-                }
-                .font(.callout)
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(link.isOnline ? Color.green : Color.secondary.opacity(0.5))
+                    .frame(width: 6, height: 6)
+                Text(link.isOnline ? "已连接" : link.stateText)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 4) {
+                Image(systemName: batterySymbol)
+                    .font(.system(size: 12))
+                    .foregroundStyle(link.batteryText == "—" ? Color.secondary : Color.green)
+                Text("电量 \(link.batteryText)")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
+
+            Text("点击设备上的任意按键设置动作")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            Button {
+                selection = selection == .general ? .control(.topLeft) : .general
+                editing = nil
+                if recordingHotKey { stopMonitor(); recordingHotKey = false }
+            } label: {
+                Label(selection == .general ? "返回按键" : "通用", systemImage: "gearshape")
+                    .font(.system(size: 12))
+            }
+            .controlSize(.small)
 
             Button {
                 link.reconnect()
             } label: {
                 Label("重新连接", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 12))
             }
-            .controlSize(.large)
+            .controlSize(.small)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
     }
 
-    // MARK: 分组
+    // MARK: 通用
 
-    private func section(_ title: String, subtitle: String, controls: [Control]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.headline)
-                Text(subtitle).font(.caption).foregroundStyle(.secondary)
-            }
-            VStack(spacing: 0) {
-                ForEach(Array(controls.enumerated()), id: \.element) { index, control in
-                    row(control)
-                    if index != controls.count - 1 {
-                        Divider().padding(.leading, 34)
+    private var generalPane: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("通用").font(.system(size: 20, weight: .semibold))
+
+                Divider()
+
+                HStack(spacing: 12) {
+                    Text("呼出窗口")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 84, alignment: .leading)
+                    Button {
+                        startHotKeyRecording()
+                    } label: {
+                        Text(recordingHotKey ? "请按新的快捷键…（Esc 取消）" : settings.hotKeyLabel)
+                            .font(.system(size: 12))
+                            .frame(minWidth: 170, alignment: .leading)
                     }
-                }
-            }
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(nsColor: .separatorColor).opacity(0.6), lineWidth: 0.5))
-        }
-    }
+                    .buttonStyle(.bordered)
+                    .disabled(!settings.hotKeyEnabled)
 
-    private func row(_ control: Control) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: control.symbol)
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-                .frame(width: 22)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(control.name).font(.system(size: 13))
-                Text(control.hint).font(.system(size: 10)).foregroundStyle(.secondary)
-            }
-            .frame(width: 150, alignment: .leading)
-
-            typeMenu(control)
-                .frame(width: 132, alignment: .leading)
-
-            editor(control)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Button {
-                store.set(control, .empty)
-                if recording == control { stopMonitor(); recording = nil }
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(store.binding(control).kind == .none ? Color.secondary.opacity(0.3) : Color.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("清除此槽位")
-            .disabled(store.binding(control).kind == .none)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-    }
-
-    private func typeMenu(_ control: Control) -> some View {
-        let kind = store.binding(control).kind
-        return Menu {
-            ForEach(ActionKind.allCases) { candidate in
-                Button {
-                    var action = store.binding(control)
-                    action.kind = candidate
-                    store.set(control, action)
-                    if candidate == .key, action.keyCode == nil { startRecording(control) }
-                    if candidate == .media, action.media == nil { action.media = MediaKey.volumeUp.rawValue; store.set(control, action) }
-                    if candidate == .system, action.system == nil { action.system = SystemAction.lockScreen.rawValue; store.set(control, action) }
-                } label: {
-                    Label(candidate.name, systemImage: candidate.symbol)
-                }
-            }
-        } label: {
-            HStack(spacing: 5) {
-                Image(systemName: kind.symbol).font(.system(size: 11))
-                Text(kind.name).font(.system(size: 12))
-                Image(systemName: "chevron.up.chevron.down").font(.system(size: 8)).foregroundStyle(.secondary)
-            }
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .frame(width: 128)
-    }
-
-    // MARK: 编辑器
-
-    @ViewBuilder
-    private func editor(_ control: Control) -> some View {
-        switch store.binding(control).kind {
-        case .none:
-            Text("—").foregroundStyle(.secondary).font(.system(size: 12))
-
-        case .key:
-            Button {
-                startRecording(control)
-            } label: {
-                Text(recording == control ? "请按一个键…（Esc 取消）" : (store.binding(control).keyLabel ?? "点击后按键盘"))
-                    .font(.system(size: 12))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-
-        case .media:
-            Picker("", selection: mediaBinding(control)) {
-                ForEach(MediaKey.allCases) { Text($0.name).tag($0) }
-            }
-            .labelsHidden()
-            .controlSize(.small)
-
-        case .text:
-            TextField("要输入的文字", text: stringBinding(control, \.text))
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 12))
-
-        case .app:
-            HStack(spacing: 6) {
-                Text(store.binding(control).path.map { ($0 as NSString).lastPathComponent } ?? "未选择")
-                    .font(.system(size: 12))
-                    .foregroundStyle(store.binding(control).path == nil ? .secondary : .primary)
-                    .lineLimit(1)
-                Spacer()
-                Button("选择 App…") { chooseApp(control) }
-                    .controlSize(.small)
-            }
-
-        case .url:
-            TextField("https://… 或文件路径", text: stringBinding(control, \.url))
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 12))
-
-        case .shell:
-            TextField("例如 open -a Notes", text: stringBinding(control, \.command))
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 12, design: .monospaced))
-
-        case .system:
-            Picker("", selection: systemBinding(control)) {
-                ForEach(SystemAction.allCases) { Text($0.name).tag($0) }
-            }
-            .labelsHidden()
-            .controlSize(.small)
-        }
-    }
-
-    // MARK: 底部
-
-    private var footer: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Image(systemName: trusted ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                    .foregroundStyle(trusted ? Color.green : Color.orange)
-                Text(trusted ? "辅助功能权限已授予" : "缺少「辅助功能」权限，快捷键/文字/系统操作不会生效")
-                    .font(.system(size: 12))
-                if !trusted {
-                    Button("去授权") { Actions.requestAccessibility() }.controlSize(.small)
-                }
-                Spacer()
-                Button("重新检查") { refreshState() }
-                    .controlSize(.small)
-                    .buttonStyle(.link)
-            }
-
-            HStack(spacing: 10) {
-                Toggle("开机时自动启动", isOn: Binding(
-                    get: { loginEnabled },
-                    set: { newValue in
-                        if let error = LoginItem.setEnabled(newValue) {
-                            loginNote = "设置失败：\(error)"
-                        } else {
-                            loginNote = newValue && !LoginItem.isEnabled ? "已提交，等待系统批准" : nil
+                    Toggle("启用", isOn: Binding(
+                        get: { settings.hotKeyEnabled },
+                        set: { newValue in
+                            settings.hotKeyEnabled = newValue
+                            HotKeyCenter.shared.apply(settings: settings)
                         }
-                        loginEnabled = LoginItem.isEnabled
+                    ))
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+
+                    Button("恢复默认") {
+                        settings.hotKeyCode = 2
+                        settings.hotKeyCarbonModifiers = UInt32(cmdKey | optionKey)
+                        settings.hotKeyLabel = "⌥⌘D"
+                        settings.hotKeyEnabled = true
+                        HotKeyCenter.shared.apply(settings: settings)
                     }
-                ))
-                .toggleStyle(.switch)
-                .controlSize(.small)
+                    .controlSize(.small)
+                }
 
-                Text(LoginItem.statusText).font(.system(size: 11)).foregroundStyle(.secondary)
+                Text("App 不占菜单栏和 Dock，这是唯一能打开设置窗口的入口；快捷键至少要带一个修饰键。")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 96)
 
-                if LoginItem.isEnabled {
-                    Button("在系统设置中查看") { LoginItem.openLoginItemsSettings() }
+                Divider()
+
+                HStack(spacing: 12) {
+                    Text("开机自启")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 84, alignment: .leading)
+                    Toggle("登录时自动启动", isOn: Binding(
+                        get: { loginEnabled },
+                        set: { newValue in
+                            if let error = LoginItem.setEnabled(newValue) {
+                                loginNote = "设置失败：\(error)"
+                            } else {
+                                loginNote = nil
+                            }
+                            loginEnabled = LoginItem.isEnabled
+                        }
+                    ))
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    Text(LoginItem.statusText).font(.system(size: 11)).foregroundStyle(.secondary)
+                    if LoginItem.isEnabled {
+                        Button("在系统设置中查看") { LoginItem.openLoginItemsSettings() }
+                            .buttonStyle(.link)
+                            .font(.system(size: 11))
+                    }
+                }
+
+                if let note = loginNote {
+                    Text(note).font(.system(size: 11)).foregroundStyle(.orange).padding(.leading, 96)
+                }
+
+                Divider()
+
+                HStack(spacing: 12) {
+                    Text("权限")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 84, alignment: .leading)
+                    Image(systemName: trusted ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                        .foregroundStyle(trusted ? Color.green : Color.orange)
+                    Text(trusted ? "辅助功能已授权" : "缺少辅助功能权限，快捷键与系统操作不会生效")
+                        .font(.system(size: 12))
+                    if !trusted {
+                        Button("去授权") { Actions.requestAccessibility() }.controlSize(.small)
+                    }
+                    Button("重新检查") { trusted = Actions.isAccessibilityGranted() }
                         .buttonStyle(.link)
                         .font(.system(size: 11))
                 }
-                Spacer()
-            }
 
-            if let note = loginNote {
-                Text(note).font(.system(size: 11)).foregroundStyle(.orange)
-            }
+                Divider()
 
-            HStack(spacing: 6) {
-                Text("配置文件").font(.system(size: 10)).foregroundStyle(.secondary)
+                HStack(spacing: 12) {
+                    Text("其他")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 84, alignment: .leading)
+                    Button("打开日志") { NSWorkspace.shared.open(logURL) }.controlSize(.small)
+                    Button("退出 App") { NSApp.terminate(nil) }.controlSize(.small)
+                }
+
                 Text(store.configPath)
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Button("打开日志") { NSWorkspace.shared.open(logURL) }
-                    .buttonStyle(.link)
-                    .font(.system(size: 10))
-                Spacer()
-                Text("⌥⌘D 随时呼出此窗口")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                Button("退出 App") { NSApp.terminate(nil) }
-                    .controlSize(.small)
             }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
-        .background(Color(nsColor: .underPageBackgroundColor).opacity(0.5))
-    }
-
-    // MARK: 绑定
-
-    private func refreshState() {
-        trusted = Actions.isAccessibilityGranted()
-        loginEnabled = LoginItem.isEnabled
-    }
-
-    private func kindBinding(_ control: Control) -> Binding<ActionKind> {
-        Binding(
-            get: { store.binding(control).kind },
-            set: { newKind in
-                var action = store.binding(control)
-                action.kind = newKind
-                store.set(control, action)
-            }
-        )
-    }
-
-    private func mediaBinding(_ control: Control) -> Binding<MediaKey> {
-        Binding(
-            get: { MediaKey(rawValue: store.binding(control).media ?? "") ?? .volumeUp },
-            set: { newValue in
-                var action = store.binding(control)
-                action.kind = .media
-                action.media = newValue.rawValue
-                store.set(control, action)
-            }
-        )
-    }
-
-    private func systemBinding(_ control: Control) -> Binding<SystemAction> {
-        Binding(
-            get: { SystemAction(rawValue: store.binding(control).system ?? "") ?? .lockScreen },
-            set: { newValue in
-                var action = store.binding(control)
-                action.kind = .system
-                action.system = newValue.rawValue
-                store.set(control, action)
-            }
-        )
-    }
-
-    private func stringBinding(_ control: Control, _ keyPath: WritableKeyPath<Action, String?>) -> Binding<String> {
-        Binding(
-            get: { store.binding(control)[keyPath: keyPath] ?? "" },
-            set: { newValue in
-                var action = store.binding(control)
-                action[keyPath: keyPath] = newValue
-                store.set(control, action)
-            }
-        )
-    }
-
-    // MARK: 交互
-
-    private func chooseApp(_ control: Control) {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.allowedContentTypes = [.applicationBundle]
-        panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        panel.prompt = "选择"
-        if panel.runModal() == .OK, let url = panel.url {
-            var action = store.binding(control)
-            action.kind = .app
-            action.path = url.path
-            store.set(control, action)
-            logLine("bind \(control.name) -> app \(url.path)")
+            .padding(24)
         }
     }
 
-    private func startRecording(_ control: Control) {
+    private var batterySymbol: String {
+        guard let value = Int(link.batteryText.replacingOccurrences(of: "%", with: "")) else {
+            return "battery.0"
+        }
+        switch value {
+        case ..<13: return "battery.0"
+        case ..<38: return "battery.25"
+        case ..<63: return "battery.50"
+        case ..<88: return "battery.75"
+        default: return "battery.100"
+        }
+    }
+
+    // MARK: 快捷键录制
+
+    private func startHotKeyRecording() {
         stopMonitor()
-        recording = control
+        recordingHotKey = true
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
-            if event.keyCode == 53 { // Esc
-                stopMonitor()
-                recording = nil
-                return nil
-            }
+            if event.keyCode == 53 { stopMonitor(); recordingHotKey = false; return nil }
             if event.isARepeat { return nil }
-            var action = store.binding(control)
-            action.kind = .key
-            action.keyCode = event.keyCode
-            action.modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask).rawValue
-            action.keyLabel = KeyLabel.describe(event)
-            store.set(control, action)
-            logLine("bind \(control.name) -> \(action.keyLabel ?? "?")")
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard flags.carbonModifiers != 0 else { return nil }
+            settings.hotKeyCode = event.keyCode
+            settings.hotKeyCarbonModifiers = flags.carbonModifiers
+            settings.hotKeyLabel = KeyLabel.describe(event)
+            settings.hotKeyEnabled = true
+            HotKeyCenter.shared.apply(settings: settings)
             stopMonitor()
-            recording = nil
+            recordingHotKey = false
             return nil
         }
     }

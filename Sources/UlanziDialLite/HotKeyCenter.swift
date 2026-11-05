@@ -1,8 +1,8 @@
 import AppKit
 import Carbon.HIToolbox
 
-/// 全局快捷键：⌥⌘D 呼出设置窗口。
-/// 用 Carbon 的 RegisterEventHotKey，属于系统框架，不需要辅助功能权限。
+/// 全局快捷键：呼出设置窗口。使用 Carbon RegisterEventHotKey，不需要辅助功能权限。
+/// 具体按键由 AppSettings 提供，可在设置界面里重新录制。
 final class HotKeyCenter {
     static let shared = HotKeyCenter()
 
@@ -10,20 +10,42 @@ final class HotKeyCenter {
 
     private var hotKeyRef: EventHotKeyRef?
     private var handlerRef: EventHandlerRef?
+    private var installed = false
 
-    func register() {
+    /// 按当前设置（重新）注册
+    func apply(settings: AppSettings) {
+        installHandlerIfNeeded()
+        unregister()
+
+        guard settings.hotKeyEnabled else {
+            logLine("global hotkey disabled")
+            return
+        }
+
+        let hotKeyID = EventHotKeyID(signature: OSType(0x5544_4C54), id: 1)
+        let status = RegisterEventHotKey(
+            UInt32(settings.hotKeyCode),
+            settings.hotKeyCarbonModifiers,
+            hotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &hotKeyRef
+        )
+        logLine("global hotkey \(settings.hotKeyLabel) register status=\(status)")
+    }
+
+    private func installHandlerIfNeeded() {
+        guard !installed else { return }
         var spec = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
             eventKind: UInt32(kEventHotKeyPressed)
         )
-
         let callback: EventHandlerUPP = { _, _, userData in
             guard let userData else { return noErr }
             let center = Unmanaged<HotKeyCenter>.fromOpaque(userData).takeUnretainedValue()
             DispatchQueue.main.async { center.onPress?() }
             return noErr
         }
-
         InstallEventHandler(
             GetApplicationEventTarget(),
             callback,
@@ -32,28 +54,13 @@ final class HotKeyCenter {
             Unmanaged.passUnretained(self).toOpaque(),
             &handlerRef
         )
-
-        // 'UDLT' 作为签名，避免和别的 App 冲突
-        let hotKeyID = EventHotKeyID(signature: OSType(0x5544_4C54), id: 1)
-        let status = RegisterEventHotKey(
-            UInt32(kVK_ANSI_D),
-            UInt32(cmdKey | optionKey),
-            hotKeyID,
-            GetApplicationEventTarget(),
-            0,
-            &hotKeyRef
-        )
-        logLine("global hotkey ⌥⌘D register status=\(status)")
+        installed = true
     }
 
     func unregister() {
         if let ref = hotKeyRef {
             UnregisterEventHotKey(ref)
             hotKeyRef = nil
-        }
-        if let handler = handlerRef {
-            RemoveEventHandler(handler)
-            handlerRef = nil
         }
     }
 }

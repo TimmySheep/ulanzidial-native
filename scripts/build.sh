@@ -11,6 +11,19 @@ mkdir -p "$OUT/Contents/MacOS"
 mkdir -p "$OUT/Contents/Resources"
 cp "Sources/$NAME/Info.plist" "$OUT/Contents/Info.plist"
 
+# App 图标：用 macOS 自带 sips + iconutil 从 1024px 源图生成 icns
+ICON_SRC="assets/AppIcon-1024.png"
+if [ -f "$ICON_SRC" ]; then
+    ICONSET="build/AppIcon.iconset"
+    mkdir -p "$ICONSET"
+    for s in 16 32 128 256 512; do
+        sips -z "$s" "$s" "$ICON_SRC" --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
+        d=$((s * 2))
+        sips -z "$d" "$d" "$ICON_SRC" --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
+    done
+    iconutil -c icns "$ICONSET" -o "$OUT/Contents/Resources/AppIcon.icns"
+fi
+
 xcrun swiftc -O \
     -target arm64-apple-macosx13.0 \
     -o "$OUT/Contents/MacOS/$NAME" \

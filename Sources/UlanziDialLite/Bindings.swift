@@ -227,10 +227,20 @@ final class BindingStore: ObservableObject {
 
     func set(_ c: Control, _ a: Action) {
         map[c] = a
+        logLine("store.set \(c.name) -> \(a.kind.rawValue)/\(a.describe)")
         save()
     }
 
+    /// 启动时留一份上次的配置，防止误清空或写坏后无法回滚
+    private func backupExisting() {
+        let backup = storeURL.deletingLastPathComponent().appendingPathComponent("config.previous.json")
+        guard FileManager.default.fileExists(atPath: storeURL.path) else { return }
+        try? FileManager.default.removeItem(at: backup)
+        try? FileManager.default.copyItem(at: storeURL, to: backup)
+    }
+
     private func load() {
+        backupExisting()
         if let data = try? Data(contentsOf: storeURL),
            let decoded = try? JSONDecoder().decode([String: Action].self, from: data) {
             var loaded: [Control: Action] = [:]

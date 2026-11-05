@@ -7,6 +7,13 @@
 Ulanzi D100H 旋钮控制器的原生轻量替代品。目标：不用 Ulanzi Studio（1 GB / ~500 MB 内存），
 只做用户要的那一层——**12 个可控槽位的自定义绑定**。
 
+## 构建与签名
+
+- **不要在 SSH 会话里跑 `scripts/build.sh`**：非图形会话拿不到钥匙串里的私钥，脚本会退回 ad-hoc 并把已经签好的 App 覆盖掉，导致公证票据对不上（曾经因此 staple 失败）。
+- 发布统一用 `scripts/release.sh`，由 Timmy 在 Mac 的「终端」里执行：构建 → Developer ID 签名 → 公证 → staple → 验证。
+- 助手可以做：改代码、编译检查（`xcrun swiftc -o /tmp/...`）、公证提交与验证（`notarytool --key` 不经过钥匙串）、读日志。
+- 助手不能做：Developer ID 签名（需要解锁的登录钥匙串）、`stapler staple` 之前不要重建 App。
+
 ## 硬规则
 
 1. **绑定关系不得写死在代码里。** 所有槽位动作来自 `config.json`，由设置界面写入；
