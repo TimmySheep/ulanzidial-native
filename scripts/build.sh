@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-NAME="DialNative"
+NAME="UlanziDialNative"
 SRC="Sources/UlanziDialLite"
 OUT="build/$NAME.app"
 

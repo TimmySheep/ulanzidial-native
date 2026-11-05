@@ -4,7 +4,7 @@ import Foundation
 
 // MARK: - 日志
 
-let logURL = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Logs/DialNative.log")
+let logURL = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Logs/UlanziDialNative.log")
 private let logQueue = DispatchQueue(label: "ulanzi.log")
 
 func logLine(_ msg: String) {

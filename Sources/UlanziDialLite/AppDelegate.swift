@@ -74,7 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "DialNative"
+        window.title = "UlanziDial Native"
         window.minSize = NSSize(width: 820, height: 560)
         window.contentView = NSHostingView(rootView: SettingsView(store: store, settings: settings, link: link))
         window.isReleasedWhenClosed = false

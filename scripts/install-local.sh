@@ -6,7 +6,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-NAME="DialNative"
+NAME="UlanziDialNative"
 DEST="/Applications/$NAME.app"
 
 echo "==> 1/5 构建并签名"
@@ -32,7 +32,7 @@ if [ -d "$DEST" ]; then
     sleep 1
 fi
 # 旧名字的安装副本也一并收走
-for OLD in "/Applications/UlanziDialLite.app"; do
+for OLD in "/Applications/DialNative.app" "/Applications/UlanziDialLite.app"; do
     if [ -d "$OLD" ]; then
         osascript -e "tell application \"Finder\" to delete POSIX file \"$OLD\"" >/dev/null 2>&1 || true
         echo "    已把旧版 $OLD 移入废纸篓"

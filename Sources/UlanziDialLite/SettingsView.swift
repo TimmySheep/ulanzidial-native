@@ -68,7 +68,7 @@ struct SettingsView: View {
 
     private var topBar: some View {
         HStack(spacing: 12) {
-            Text("DialNative").font(.system(size: 17, weight: .semibold))
+            Text("UlanziDial Native").font(.system(size: 17, weight: .semibold))
 
             HStack(spacing: 5) {
                 Circle()

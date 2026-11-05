@@ -232,7 +232,7 @@ final class BindingStore: ObservableObject {
 
     private let storeURL: URL = {
         let dir = URL(fileURLWithPath: NSHomeDirectory())
-            .appendingPathComponent("Library/Application Support/DialNative", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/UlanziDialNative", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("config.json")
     }()
@@ -306,13 +306,17 @@ final class BindingStore: ObservableObject {
     }
 
     private func load() {
-        // 从旧名字迁移配置（Bundle ID 与目录都改过名）
-        let legacy = URL(fileURLWithPath: NSHomeDirectory())
-            .appendingPathComponent("Library/Application Support/UlanziDialLite/config.json")
-        if !FileManager.default.fileExists(atPath: storeURL.path),
-           FileManager.default.fileExists(atPath: legacy.path) {
-            try? FileManager.default.copyItem(at: legacy, to: storeURL)
-            logLine("config migrated from UlanziDialLite")
+        // 从旧名字迁移配置（改过两次名：UlanziDialLite → DialNative → UlanziDialNative）
+        if !FileManager.default.fileExists(atPath: storeURL.path) {
+            for oldName in ["DialNative", "UlanziDialLite"] {
+                let legacy = URL(fileURLWithPath: NSHomeDirectory())
+                    .appendingPathComponent("Library/Application Support/\(oldName)/config.json")
+                if FileManager.default.fileExists(atPath: legacy.path) {
+                    try? FileManager.default.copyItem(at: legacy, to: storeURL)
+                    logLine("config migrated from \(oldName)")
+                    break
+                }
+            }
         }
 
         backupExisting()
