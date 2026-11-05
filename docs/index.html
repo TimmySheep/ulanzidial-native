@@ -70,6 +70,24 @@
   </div>
 </section>
 
+<section class="section" id="gestures">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>三种手势，一个键</h2>
+      <p>单击、双击、长按各绑一个动作。没绑双击的键按下就触发，不会因为要等第二下而变慢。</p>
+    </div>
+    <div class="glass" style="padding:22px 24px">
+      <pre style="margin:0;font:13px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-x:auto"><code>ulanzidial set 顶部左键 key cmd+shift+4
+ulanzidial set 顶部左键 key cmd+shift+5 --double
+ulanzidial set 左侧上键 app "/Applications/DaVinci Resolve.app" --long
+ulanzidial list</code></pre>
+      <p style="margin:14px 0 0;font-size:13px;color:var(--muted)">
+        改完立刻生效——App 监听配置文件，不需要重启。这条命令行工具也是给脚本和 AI 助手用的。
+      </p>
+    </div>
+  </div>
+</section>
+
 <section class="section" id="features">
   <div class="wrap">
     <div class="section-head">

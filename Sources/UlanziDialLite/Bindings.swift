@@ -63,10 +63,33 @@ enum Control: Int, CaseIterable, Codable, Hashable {
         }
     }
 
+    /// 转动类：离散事件、可连续重复，不参与单击/双击/长按判定
+    var isRotational: Bool {
+        switch self {
+        case .rotateCW, .rotateCCW, .knobHoldCW, .knobHoldCCW: return true
+        default: return false
+        }
+    }
+
     static func from(id: UInt8) -> Control? { Control(rawValue: Int(id)) }
 }
 
 // MARK: - 动作类型
+
+/// 同一个键的三种点击手势（Action Combination）
+enum ClickGesture: String, Codable, CaseIterable, Identifiable {
+    case single, double, long
+
+    var id: String { rawValue }
+
+    var name: String {
+        switch self {
+        case .single: return "单击"
+        case .double: return "双击"
+        case .long:   return "长按"
+        }
+    }
+}
 
 enum ActionKind: String, Codable, CaseIterable, Identifiable {
     case none
@@ -227,6 +250,8 @@ struct Action: Codable, Equatable {
 
 final class BindingStore: ObservableObject {
     @Published private(set) var profiles: [String: [Control: Action]] = [:]
+    @Published private(set) var doubleMap: [String: [Control: Action]] = [:]
+    @Published private(set) var longMap: [String: [Control: Action]] = [:]
     @Published private(set) var activeProfile: String = "默认"
     @Published private(set) var appRules: [String: String] = [:]
 
@@ -237,9 +262,48 @@ final class BindingStore: ObservableObject {
         return dir.appendingPathComponent("config.json")
     }()
 
-    init() { load() }
+    init() {
+        load()
+        startWatching()
+    }
 
     func binding(_ c: Control) -> Action { profiles[activeProfile]?[c] ?? .empty }
+
+    func doubleBinding(_ c: Control) -> Action { doubleMap[activeProfile]?[c] ?? .empty }
+    func longBinding(_ c: Control) -> Action { longMap[activeProfile]?[c] ?? .empty }
+
+    /// 按手势取当前动作
+    func action(_ c: Control, gesture: ClickGesture) -> Action {
+        switch gesture {
+        case .single: return binding(c)
+        case .double: return doubleBinding(c)
+        case .long:   return longBinding(c)
+        }
+    }
+
+    /// 这个键是否有单击以外的绑定（决定要不要延迟判定双击）
+    func hasExtraGestures(_ c: Control) -> Bool {
+        doubleBinding(c).kind != .none || longBinding(c).kind != .none
+    }
+
+    func set(_ c: Control, gesture: ClickGesture, _ a: Action) {
+        switch gesture {
+        case .single:
+            set(c, a)
+        case .double:
+            var map = doubleMap[activeProfile] ?? [:]
+            map[c] = a
+            doubleMap[activeProfile] = map
+            logLine("store.set [\(activeProfile)] \(c.name) 双击 -> \(a.kind.rawValue)/\(a.describe)")
+            save()
+        case .long:
+            var map = longMap[activeProfile] ?? [:]
+            map[c] = a
+            longMap[activeProfile] = map
+            logLine("store.set [\(activeProfile)] \(c.name) 长按 -> \(a.kind.rawValue)/\(a.describe)")
+            save()
+        }
+    }
 
     func set(_ c: Control, _ a: Action) {
         var map = profiles[activeProfile] ?? [:]
@@ -271,6 +335,8 @@ final class BindingStore: ObservableObject {
     func deleteProfile(_ name: String) {
         guard name != "默认", profiles.count > 1 else { return }
         profiles.removeValue(forKey: name)
+        doubleMap.removeValue(forKey: name)
+        longMap.removeValue(forKey: name)
         for (bundle, target) in appRules where target == name {
             appRules.removeValue(forKey: bundle)
         }
@@ -335,9 +401,11 @@ final class BindingStore: ObservableObject {
             }
             profiles = decoded
             appRules = config.appRules ?? [:]
+            doubleMap = BindingStore.decodeMaps(config.doubleBindings)
+            longMap = BindingStore.decodeMaps(config.longBindings)
             let wanted = config.activeProfile ?? "默认"
             activeProfile = decoded[wanted] != nil ? wanted : (decoded.keys.sorted().first ?? "默认")
-            logLine("config loaded: \(decoded.count) 个配置, \(appRules.count) 条应用规则")
+            logLine("config loaded: \(decoded.count) 个配置, \(appRules.count) 条应用规则, 双击 \(doubleMap.values.reduce(0) { $0 + $1.count }) 项, 长按 \(longMap.values.reduce(0) { $0 + $1.count }) 项")
             return
         }
 
@@ -360,10 +428,75 @@ final class BindingStore: ObservableObject {
         for (name, map) in profiles {
             encoded[name] = BindingStore.encodeBindings(map)
         }
-        let config = ConfigFile(version: 2, activeProfile: activeProfile, profiles: encoded, appRules: appRules)
+        let config = ConfigFile(
+            version: 3,
+            activeProfile: activeProfile,
+            profiles: encoded,
+            appRules: appRules,
+            doubleBindings: BindingStore.encodeMaps(doubleMap),
+            longBindings: BindingStore.encodeMaps(longMap)
+        )
         if let data = try? JSONEncoder().encode(config) {
+            lastSelfWrite = Date()
             try? data.write(to: storeURL)
         }
+    }
+
+    // MARK: 外部改动（CLI 写入）后自动生效
+
+    private var fileWatcher: DispatchSourceFileSystemObject?
+    private var lastSelfWrite = Date.distantPast
+
+    private func startWatching() {
+        fileWatcher?.cancel()
+        fileWatcher = nil
+        let fd = open(storeURL.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write, .extend, .delete, .rename],
+            queue: .main
+        )
+        source.setEventHandler { [weak self] in
+            guard let self else { return }
+            // 自己刚写完不必重读
+            if Date().timeIntervalSince(self.lastSelfWrite) < 0.35 { return }
+            self.reloadFromDisk()
+            self.startWatching()
+        }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        fileWatcher = source
+    }
+
+    func reloadFromDisk() {
+        guard let data = try? Data(contentsOf: storeURL),
+              let config = try? JSONDecoder().decode(ConfigFile.self, from: data) else { return }
+        var decoded: [String: [Control: Action]] = [:]
+        for (name, raw) in config.profiles {
+            decoded[name] = BindingStore.decodeBindings(raw)
+        }
+        guard !decoded.isEmpty else { return }
+        profiles = decoded
+        doubleMap = BindingStore.decodeMaps(config.doubleBindings)
+        longMap = BindingStore.decodeMaps(config.longBindings)
+        appRules = config.appRules ?? [:]
+        let wanted = config.activeProfile ?? activeProfile
+        if decoded[wanted] != nil { activeProfile = wanted }
+        logLine("config reloaded from disk (external change)")
+    }
+
+    private static func encodeMaps(_ input: [String: [Control: Action]]) -> [String: [String: Action]] {
+        var out: [String: [String: Action]] = [:]
+        for (name, map) in input { out[name] = encodeBindings(map) }
+        return out
+    }
+
+    private static func decodeMaps(_ raw: [String: [String: Action]]?) -> [String: [Control: Action]] {
+        guard let raw else { return [:] }
+        var out: [String: [Control: Action]] = [:]
+        for (name, map) in raw { out[name] = decodeBindings(map) }
+        return out
     }
 
     private static func encodeBindings(_ map: [Control: Action]) -> [String: Action] {
@@ -400,4 +533,7 @@ struct ConfigFile: Codable {
     var activeProfile: String?
     var profiles: [String: [String: Action]]
     var appRules: [String: String]?
+    /// 双击 / 长按绑定（v3 新增，旧配置里没有这两个字段）
+    var doubleBindings: [String: [String: Action]]?
+    var longBindings: [String: [String: Action]]?
 }

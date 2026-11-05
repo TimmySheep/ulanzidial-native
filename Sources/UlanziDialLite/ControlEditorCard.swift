@@ -9,6 +9,7 @@ struct ControlEditorCard: View {
     var onClose: () -> Void
 
     @State private var gesture: Control?
+    @State private var click: ClickGesture = .single
     @State private var recording = false
     @State private var monitor: Any?
 
@@ -16,6 +17,19 @@ struct ControlEditorCard: View {
 
     private var isKnob: Bool { knobSlots.contains(control) }
     private var active: Control { gesture ?? control }
+
+    /// 当前正在编辑的动作（键：按手势取；旋钮：按槽位取）
+    private var currentAction: Action {
+        isKnob ? store.binding(active) : store.action(active, gesture: click)
+    }
+
+    private func setCurrent(_ a: Action) {
+        if isKnob {
+            store.set(active, a)
+        } else {
+            store.set(active, gesture: click, a)
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -54,6 +68,38 @@ struct ControlEditorCard: View {
                 .menuIndicator(.hidden)
             }
 
+            if !isKnob {
+                HStack(spacing: 6) {
+                    ForEach(ClickGesture.allCases) { g in
+                        Button {
+                            click = g
+                            recording = false
+                            stopMonitor()
+                        } label: {
+                            Text(g.name)
+                                .font(.system(size: 12, weight: click == g ? .semibold : .regular))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 7)
+                                        .fill(click == g ? Color.accentColor.opacity(0.15) : Color(nsColor: .controlBackgroundColor))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 7)
+                                        .stroke(click == g ? Color.accentColor.opacity(0.5) : Color(nsColor: .separatorColor), lineWidth: 0.5)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    Spacer()
+                    if click != .single {
+                        Text("单击仍按原绑定执行")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+
             Divider()
 
             typeMenu
@@ -61,19 +107,19 @@ struct ControlEditorCard: View {
 
             HStack(spacing: 8) {
                 Button {
-                    Actions.perform(store.binding(active))
-                    logLine("TEST \(active.name) -> \(store.binding(active).describe)")
+                    Actions.perform(currentAction)
+                    logLine("TEST \(active.name) -> \(currentAction.describe)")
                 } label: {
                     Label("试一下", systemImage: "play.circle")
                 }
                 .controlSize(.small)
-                .disabled(store.binding(active).kind == .none)
+                .disabled(currentAction.kind == .none)
 
                 Button("清除") {
-                    store.set(active, .empty)
+                    setCurrent(.empty)
                 }
                 .controlSize(.small)
-                .disabled(store.binding(active).kind == .none)
+                .disabled(currentAction.kind == .none)
 
                 Spacer()
 
@@ -93,7 +139,7 @@ struct ControlEditorCard: View {
                 .foregroundStyle(Color.accentColor)
             Text(control.name).font(.system(size: 15, weight: .semibold))
             Spacer()
-            Text(store.binding(active).kind.name)
+            Text(currentAction.kind.name)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
@@ -103,17 +149,17 @@ struct ControlEditorCard: View {
         Menu {
             ForEach(ActionKind.allCases) { kind in
                 Button {
-                    var action = store.binding(active)
+                    var action = currentAction
                     action.kind = kind
-                    store.set(active, action)
+                    setCurrent(action)
                     if kind == .key, action.keyCode == nil { startRecording() }
                     if kind == .media, action.media == nil {
                         action.media = MediaKey.volumeUp.rawValue
-                        store.set(active, action)
+                        setCurrent(action)
                     }
                     if kind == .system, action.system == nil {
                         action.system = SystemAction.lockScreen.rawValue
-                        store.set(active, action)
+                        setCurrent(action)
                     }
                 } label: {
                     Label(kind.name, systemImage: kind.symbol)
@@ -121,8 +167,8 @@ struct ControlEditorCard: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: store.binding(active).kind.symbol).font(.system(size: 11))
-                Text(store.binding(active).kind.name).font(.system(size: 12))
+                Image(systemName: currentAction.kind.symbol).font(.system(size: 11))
+                Text(currentAction.kind.name).font(.system(size: 12))
                 Spacer()
                 Image(systemName: "chevron.down").font(.system(size: 9)).foregroundStyle(.secondary)
             }
@@ -137,7 +183,7 @@ struct ControlEditorCard: View {
 
     @ViewBuilder
     private var editor: some View {
-        switch store.binding(active).kind {
+        switch currentAction.kind {
         case .none:
             Text("选择一个动作类型开始设置")
                 .font(.system(size: 11))
@@ -147,7 +193,7 @@ struct ControlEditorCard: View {
             Button {
                 startRecording()
             } label: {
-                Text(recording ? "请按一个键…（Esc 取消）" : (store.binding(active).keyLabel ?? "点击后按键盘"))
+                Text(recording ? "请按一个键…（Esc 取消）" : (currentAction.keyLabel ?? "点击后按键盘"))
                     .font(.system(size: 12))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -165,9 +211,9 @@ struct ControlEditorCard: View {
 
         case .app:
             HStack(spacing: 8) {
-                Text(store.binding(active).path.map { ($0 as NSString).lastPathComponent } ?? "未选择")
+                Text(currentAction.path.map { ($0 as NSString).lastPathComponent } ?? "未选择")
                     .font(.system(size: 12))
-                    .foregroundStyle(store.binding(active).path == nil ? .secondary : .primary)
+                    .foregroundStyle(currentAction.path == nil ? .secondary : .primary)
                     .lineLimit(1)
                 Spacer()
                 Button("选择 App…") { chooseApp() }.controlSize(.small)
@@ -198,7 +244,7 @@ struct ControlEditorCard: View {
     @State private var recordingStep: Int?
 
     private var sequenceEditor: some View {
-        let steps = store.binding(active).steps ?? []
+        let steps = currentAction.steps ?? []
         return VStack(alignment: .leading, spacing: 10) {
             if steps.isEmpty {
                 Text("按顺序执行多个动作，每步可设等待时间")
@@ -321,36 +367,36 @@ struct ControlEditorCard: View {
     }
 
     private func addStep() {
-        var action = store.binding(active)
+        var action = currentAction
         var steps = action.steps ?? []
         steps.append(Step())
         action.steps = steps
         action.kind = .sequence
-        store.set(active, action)
+        setCurrent(action)
     }
 
     private func removeStep(_ index: Int) {
-        var action = store.binding(active)
+        var action = currentAction
         var steps = action.steps ?? []
         guard index < steps.count else { return }
         steps.remove(at: index)
         action.steps = steps
-        store.set(active, action)
+        setCurrent(action)
     }
 
     private func updateStep(_ index: Int, _ transform: (inout Step) -> Void) {
-        var action = store.binding(active)
+        var action = currentAction
         var steps = action.steps ?? []
         guard index < steps.count else { return }
         transform(&steps[index])
         action.steps = steps
-        store.set(active, action)
+        setCurrent(action)
     }
 
     private func stepMediaBinding(_ index: Int) -> Binding<MediaKey> {
         Binding(
             get: {
-                let steps = store.binding(active).steps ?? []
+                let steps = currentAction.steps ?? []
                 let raw = index < steps.count ? (steps[index].action.media ?? "") : ""
                 return MediaKey(rawValue: raw) ?? .volumeUp
             },
@@ -363,7 +409,7 @@ struct ControlEditorCard: View {
     private func stepSystemBinding(_ index: Int) -> Binding<SystemAction> {
         Binding(
             get: {
-                let steps = store.binding(active).steps ?? []
+                let steps = currentAction.steps ?? []
                 let raw = index < steps.count ? (steps[index].action.system ?? "") : ""
                 return SystemAction(rawValue: raw) ?? .lockScreen
             },
@@ -376,7 +422,7 @@ struct ControlEditorCard: View {
     private func stepStringBinding(_ index: Int, _ keyPath: WritableKeyPath<Action, String?>) -> Binding<String> {
         Binding(
             get: {
-                let steps = store.binding(active).steps ?? []
+                let steps = currentAction.steps ?? []
                 return index < steps.count ? (steps[index].action[keyPath: keyPath] ?? "") : ""
             },
             set: { newValue in
@@ -445,35 +491,35 @@ struct ControlEditorCard: View {
 
     private var mediaBinding: Binding<MediaKey> {
         Binding(
-            get: { MediaKey(rawValue: store.binding(active).media ?? "") ?? .volumeUp },
+            get: { MediaKey(rawValue: currentAction.media ?? "") ?? .volumeUp },
             set: { newValue in
-                var action = store.binding(active)
+                var action = currentAction
                 action.kind = .media
                 action.media = newValue.rawValue
-                store.set(active, action)
+                setCurrent(action)
             }
         )
     }
 
     private var systemBinding: Binding<SystemAction> {
         Binding(
-            get: { SystemAction(rawValue: store.binding(active).system ?? "") ?? .lockScreen },
+            get: { SystemAction(rawValue: currentAction.system ?? "") ?? .lockScreen },
             set: { newValue in
-                var action = store.binding(active)
+                var action = currentAction
                 action.kind = .system
                 action.system = newValue.rawValue
-                store.set(active, action)
+                setCurrent(action)
             }
         )
     }
 
     private func stringBinding(_ keyPath: WritableKeyPath<Action, String?>) -> Binding<String> {
         Binding(
-            get: { store.binding(active)[keyPath: keyPath] ?? "" },
+            get: { currentAction[keyPath: keyPath] ?? "" },
             set: { newValue in
-                var action = store.binding(active)
+                var action = currentAction
                 action[keyPath: keyPath] = newValue
-                store.set(active, action)
+                setCurrent(action)
             }
         )
     }
@@ -487,10 +533,10 @@ struct ControlEditorCard: View {
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
         panel.prompt = "选择"
         if panel.runModal() == .OK, let url = panel.url {
-            var action = store.binding(active)
+            var action = currentAction
             action.kind = .app
             action.path = url.path
-            store.set(active, action)
+            setCurrent(action)
         }
     }
 

@@ -2,25 +2,6 @@ import AppKit
 import CoreBluetooth
 import Foundation
 
-// MARK: - 日志
-
-let logURL = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Logs/UlanziDialNative.log")
-private let logQueue = DispatchQueue(label: "ulanzi.log")
-
-func logLine(_ msg: String) {
-    let ts = ISO8601DateFormatter().string(from: Date())
-    let line = "[\(ts)] \(msg)\n"
-    logQueue.async {
-        if let h = try? FileHandle(forWritingTo: logURL) {
-            h.seekToEndOfFile()
-            h.write(Data(line.utf8))
-            try? h.close()
-        } else {
-            try? Data(line.utf8).write(to: logURL)
-        }
-    }
-}
-
 // MARK: - TEA（原始 TEA，32 轮；20 字节包只加密前 16 字节，尾部 4 字节明文）
 
 enum TEA {

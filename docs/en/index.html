@@ -70,6 +70,24 @@
   </div>
 </section>
 
+<section class="section" id="gestures">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Three gestures, one key</h2>
+      <p>Click, double-click and long-press each get their own action. Keys without a double-click binding fire on press — no waiting for a second click.</p>
+    </div>
+    <div class="glass" style="padding:22px 24px">
+      <pre style="margin:0;font:13px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-x:auto"><code>ulanzidial set topLeft key cmd+shift+4
+ulanzidial set topLeft key cmd+shift+5 --double
+ulanzidial set sideUpperLeft app "/Applications/DaVinci Resolve.app" --long
+ulanzidial list</code></pre>
+      <p style="margin:14px 0 0;font-size:13px;color:var(--muted)">
+        Changes apply instantly — the app watches its config file, no restart needed. The CLI is also meant for scripts and AI assistants.
+      </p>
+    </div>
+  </div>
+</section>
+
 <section class="section" id="features">
   <div class="wrap">
     <div class="section-head">

@@ -55,13 +55,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 
-    /// 只在按下/步进时触发一次；旋钮点击是松手时补发的 down+up 对，因此只认 down
+    // MARK: - 单击 / 双击 / 长按
+
+    private lazy var gestures: GestureTracker = {
+        GestureTracker(
+            hasBinding: { [weak self] control, gesture in
+                guard let self else { return false }
+                return self.store.action(control, gesture: gesture).kind != .none
+            },
+            fire: { [weak self] control, gesture in
+                guard let self else { return }
+                let action = self.store.action(control, gesture: gesture)
+                guard action.kind != .none else { return }
+                logLine("ACTION \(control.name)[\(gesture.name)] -> \(action.describe)")
+                Actions.perform(action)
+            }
+        )
+    }()
+
+    /// 设备事件入口：转动类直通，按键走手势判定
     private func handle(control: Control, isDown: Bool) {
-        guard isDown else { return }
-        let action = store.binding(control)
-        guard action.kind != .none else { return }
-        logLine("ACTION \(control.name) -> \(action.describe)")
-        Actions.perform(action)
+        if isDown {
+            gestures.down(control)
+        } else {
+            gestures.up(control)
+        }
     }
 
     @objc func showSettings() {

@@ -43,7 +43,15 @@ done
 echo "==> 4/5 安装到 $DEST"
 ditto "build/$NAME.app" "$DEST"
 
-echo "==> 5/5 启动并验证"
+echo "==> 5/6 安装命令行工具到 /usr/local/bin"
+if [ -w /usr/local/bin ]; then
+    cp build/ulanzidial /usr/local/bin/ulanzidial
+else
+    sudo install -m 755 build/ulanzidial /usr/local/bin/ulanzidial
+fi
+echo "    ulanzidial $(build/ulanzidial status >/dev/null 2>&1 && echo 可用)"
+
+echo "==> 6/6 启动并验证"
 open "$DEST"
 sleep 2
 codesign -dv --verbose=2 "$DEST" 2>&1 | grep -E "Authority=Developer ID Application|TeamIdentifier" || true
