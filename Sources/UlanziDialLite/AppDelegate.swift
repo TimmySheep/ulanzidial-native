@@ -19,6 +19,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotKeyCenter.shared.onPress = { [weak self] in self?.showSettings() }
         HotKeyCenter.shared.apply(settings: settings)
 
+        // 前台 App 变化 → 按规则切换配置
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard let self else { return }
+            // 正在设置界面里操作时不自动切换，避免眼前这套配置突然变掉
+            if self.settingsWindow?.isKeyWindow == true { return }
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            guard let bundle = app.bundleIdentifier, bundle != Bundle.main.bundleIdentifier else { return }
+            self.store.applyAppRule(bundleID: bundle)
+        }
+
         // 首次运行弹一次设置窗口，之后（含开机自启）完全静默
         if !UserDefaults.standard.bool(forKey: "didLaunchBefore") {
             UserDefaults.standard.set(true, forKey: "didLaunchBefore")
@@ -56,11 +70,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1000, height: 720),
-            styleMask: [.titled, .closable, .miniaturizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
-        window.title = "Ulanzi Dial Lite"
+        window.title = "DialNative"
+        window.minSize = NSSize(width: 820, height: 560)
         window.contentView = NSHostingView(rootView: SettingsView(store: store, settings: settings, link: link))
         window.isReleasedWhenClosed = false
         window.center()

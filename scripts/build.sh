@@ -4,12 +4,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-NAME="UlanziDialLite"
+NAME="DialNative"
+SRC="Sources/UlanziDialLite"
 OUT="build/$NAME.app"
 
 mkdir -p "$OUT/Contents/MacOS"
 mkdir -p "$OUT/Contents/Resources"
-cp "Sources/$NAME/Info.plist" "$OUT/Contents/Info.plist"
+cp "$SRC/Info.plist" "$OUT/Contents/Info.plist"
 
 # App 图标：用 macOS 自带 sips + iconutil 从 1024px 源图生成 icns
 ICON_SRC="assets/AppIcon-1024.png"
@@ -27,7 +28,7 @@ fi
 xcrun swiftc -O \
     -target arm64-apple-macosx13.0 \
     -o "$OUT/Contents/MacOS/$NAME" \
-    Sources/$NAME/*.swift
+    $SRC/*.swift
 
 IDENTITY="${SIGN_IDENTITY:-}"
 if [ -z "$IDENTITY" ]; then

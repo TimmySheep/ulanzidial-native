@@ -4,7 +4,7 @@ import Foundation
 
 // MARK: - 日志
 
-let logURL = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Logs/UlanziDialLite.log")
+let logURL = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Logs/DialNative.log")
 private let logQueue = DispatchQueue(label: "ulanzi.log")
 
 func logLine(_ msg: String) {
@@ -109,6 +109,8 @@ final class DialLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBPe
     static let svcUUID = CBUUID(string: "00001971-0000-1000-8000-00805F9B34FB")
     static let writeUUID = CBUUID(string: "0000FD01-0000-1000-8000-00805F9B34FB")
     static let notifyUUID = CBUUID(string: "0000FD00-0000-1000-8000-00805F9B34FB")
+    /// 标准 GATT 电量特征（Battery Service 0x180F）
+    static let batteryUUID = CBUUID(string: "00002A19-0000-1000-8000-00805F9B34FB")
 
     var onEvent: ((Control, Bool) -> Void)?
 
@@ -116,6 +118,7 @@ final class DialLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBPe
     private var peripheral: CBPeripheral?
     private var writeCh: CBCharacteristic?
     private var notifyCh: CBCharacteristic?
+    private var batteryCh: CBCharacteristic?
     private var hbTimer: Timer?
     private var scanTimer: Timer?
     private var wantsReconnect = true
@@ -213,7 +216,7 @@ final class DialLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBPe
     func centralManager(_ c: CBCentralManager, didConnect p: CBPeripheral) {
         logLine("connected \(p.name ?? "-")")
         stateText = "发现服务"
-        p.discoverServices([Self.svcUUID])
+        p.discoverServices(nil)
     }
 
     func centralManager(_ c: CBCentralManager, didFailToConnect p: CBPeripheral, error: Error?) {
@@ -250,10 +253,19 @@ final class DialLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBPe
         for ch in s.characteristics ?? [] {
             if ch.uuid == Self.writeUUID { writeCh = ch }
             if ch.uuid == Self.notifyUUID { notifyCh = ch }
+            if ch.uuid == Self.batteryUUID { batteryCh = ch }
         }
+
+        // 标准电量特征：订阅并主动读一次
+        if let b = batteryCh {
+            p.setNotifyValue(true, for: b)
+            p.readValue(for: b)
+            logLine("battery characteristic found, reading…")
+        }
+
         if let n = notifyCh, writeCh != nil {
             p.setNotifyValue(true, for: n)
-        } else {
+        } else if notifyCh == nil && writeCh == nil {
             logLine("未找到 fd00/fd01 特征值，停止")
             stateText = "特征值不匹配"
         }
@@ -287,6 +299,18 @@ final class DialLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBPe
 
     func peripheral(_ p: CBPeripheral, didUpdateValueFor ch: CBCharacteristic, error: Error?) {
         guard let data = ch.value else { return }
+
+        // 标准 GATT 电量
+        if ch.uuid == Self.batteryUUID {
+            let bytes = [UInt8](data)
+            if let pct = bytes.first, pct <= 100 {
+                batteryText = "\(pct)%"
+                UserDefaults.standard.set(Int(pct), forKey: "lastBattery")
+                logLine("battery(GATT) \(pct)%")
+            }
+            return
+        }
+
         let plain = TEA.decrypt([UInt8](data))
         decode(plain)
     }

@@ -66,6 +66,23 @@ enum Actions {
         case .system:
             guard let raw = action.system, let sys = SystemAction(rawValue: raw) else { return }
             runSystem(sys)
+        case .sequence:
+            runSequence(action.steps ?? [])
+        }
+    }
+
+    // MARK: 多项操作
+
+    /// 顺序执行每一步，步与步之间按 delayMs 等待
+    private static func runSequence(_ steps: [Step], index: Int = 0) {
+        guard index < steps.count else { return }
+        let step = steps[index]
+        perform(step.action)
+        let next = index + 1
+        guard next < steps.count else { return }
+        let delay = max(0, min(step.delayMs, 60_000))
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay)) {
+            runSequence(steps, index: next)
         }
     }
 

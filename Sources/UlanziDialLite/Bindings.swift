@@ -77,6 +77,7 @@ enum ActionKind: String, Codable, CaseIterable, Identifiable {
     case url
     case shell
     case system
+    case sequence
 
     var id: String { rawValue }
 
@@ -90,6 +91,7 @@ enum ActionKind: String, Codable, CaseIterable, Identifiable {
         case .url: return "打开网址/文件"
         case .shell: return "运行命令"
         case .system: return "系统操作"
+        case .sequence: return "多项操作"
         }
     }
 
@@ -103,8 +105,16 @@ enum ActionKind: String, Codable, CaseIterable, Identifiable {
         case .url: return "link"
         case .shell: return "terminal"
         case .system: return "gearshape.2"
+        case .sequence: return "list.bullet.rectangle"
         }
     }
+}
+
+/// 多项操作里的一步：动作 + 执行后等待多久再做下一步
+struct Step: Codable, Equatable, Identifiable {
+    var id: UUID = UUID()
+    var action: Action = .empty
+    var delayMs: Int = 120
 }
 
 enum MediaKey: String, Codable, CaseIterable, Identifiable {
@@ -192,6 +202,7 @@ struct Action: Codable, Equatable {
     var url: String?
     var command: String?
     var system: String?
+    var steps: [Step]?
 
     static let empty = Action()
 
@@ -205,6 +216,9 @@ struct Action: Codable, Equatable {
         case .url: return url ?? "未填写"
         case .shell: return command ?? "未填写"
         case .system: return SystemAction(rawValue: system ?? "")?.name ?? "未设置"
+        case .sequence:
+            let count = steps?.count ?? 0
+            return count == 0 ? "空的多项操作" : "\(count) 步操作"
         }
     }
 }
@@ -212,23 +226,75 @@ struct Action: Codable, Equatable {
 // MARK: - 配置存储
 
 final class BindingStore: ObservableObject {
-    @Published private(set) var map: [Control: Action] = [:]
+    @Published private(set) var profiles: [String: [Control: Action]] = [:]
+    @Published private(set) var activeProfile: String = "默认"
+    @Published private(set) var appRules: [String: String] = [:]
 
     private let storeURL: URL = {
         let dir = URL(fileURLWithPath: NSHomeDirectory())
-            .appendingPathComponent("Library/Application Support/UlanziDialLite", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/DialNative", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("config.json")
     }()
 
     init() { load() }
 
-    func binding(_ c: Control) -> Action { map[c] ?? .empty }
+    func binding(_ c: Control) -> Action { profiles[activeProfile]?[c] ?? .empty }
 
     func set(_ c: Control, _ a: Action) {
+        var map = profiles[activeProfile] ?? [:]
         map[c] = a
-        logLine("store.set \(c.name) -> \(a.kind.rawValue)/\(a.describe)")
+        profiles[activeProfile] = map
+        logLine("store.set [\(activeProfile)] \(c.name) -> \(a.kind.rawValue)/\(a.describe)")
         save()
+    }
+
+    // MARK: 配置（profile）
+
+    var profileNames: [String] { profiles.keys.sorted() }
+
+    func switchTo(_ name: String, reason: String = "") {
+        guard profiles[name] != nil, name != activeProfile else { return }
+        activeProfile = name
+        logLine("profile -> \(name) \(reason)")
+        save()
+    }
+
+    func addProfile(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, profiles[trimmed] == nil else { return }
+        profiles[trimmed] = [:]
+        activeProfile = trimmed
+        save()
+    }
+
+    func deleteProfile(_ name: String) {
+        guard name != "默认", profiles.count > 1 else { return }
+        profiles.removeValue(forKey: name)
+        for (bundle, target) in appRules where target == name {
+            appRules.removeValue(forKey: bundle)
+        }
+        if activeProfile == name { activeProfile = "默认" }
+        save()
+    }
+
+    // MARK: 应用规则
+
+    func setRule(bundleID: String, profile: String) {
+        guard profiles[profile] != nil else { return }
+        appRules[bundleID] = profile
+        save()
+    }
+
+    func removeRule(bundleID: String) {
+        appRules.removeValue(forKey: bundleID)
+        save()
+    }
+
+    /// 前台 App 变化时调用：该 App 有规则就切到对应配置，否则回默认
+    func applyAppRule(bundleID: String?) {
+        let target = (bundleID.flatMap { appRules[$0] }) ?? "默认"
+        switchTo(target, reason: "app=\(bundleID ?? "-")")
     }
 
     /// 启动时留一份上次的配置，防止误清空或写坏后无法回滚
@@ -240,38 +306,94 @@ final class BindingStore: ObservableObject {
     }
 
     private func load() {
+        // 从旧名字迁移配置（Bundle ID 与目录都改过名）
+        let legacy = URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent("Library/Application Support/UlanziDialLite/config.json")
+        if !FileManager.default.fileExists(atPath: storeURL.path),
+           FileManager.default.fileExists(atPath: legacy.path) {
+            try? FileManager.default.copyItem(at: legacy, to: storeURL)
+            logLine("config migrated from UlanziDialLite")
+        }
+
         backupExisting()
-        if let data = try? Data(contentsOf: storeURL),
-           let decoded = try? JSONDecoder().decode([String: Action].self, from: data) {
-            var loaded: [Control: Action] = [:]
-            for (key, action) in decoded {
-                if let raw = UInt8(key, radix: 16), let control = Control.from(id: raw) {
-                    loaded[control] = action
-                }
-            }
-            map = loaded
-            logLine("config loaded: \(loaded.count) 项")
-        } else {
-            // 首次运行只给最自然的三个默认值，其余留给用户自己设
-            map = [
-                .rotateCW: Action(kind: .media, media: MediaKey.volumeUp.rawValue),
-                .rotateCCW: Action(kind: .media, media: MediaKey.volumeDown.rawValue),
-                .knobClick: Action(kind: .media, media: MediaKey.mute.rawValue),
-            ]
+        guard let data = try? Data(contentsOf: storeURL) else {
+            profiles = ["默认": BindingStore.defaultBindings()]
             save()
             logLine("config created with defaults")
+            return
         }
+
+        // v2：多配置
+        if let config = try? JSONDecoder().decode(ConfigFile.self, from: data) {
+            var decoded: [String: [Control: Action]] = [:]
+            for (name, raw) in config.profiles {
+                decoded[name] = BindingStore.decodeBindings(raw)
+            }
+            profiles = decoded
+            appRules = config.appRules ?? [:]
+            let wanted = config.activeProfile ?? "默认"
+            activeProfile = decoded[wanted] != nil ? wanted : (decoded.keys.sorted().first ?? "默认")
+            logLine("config loaded: \(decoded.count) 个配置, \(appRules.count) 条应用规则")
+            return
+        }
+
+        // v1：扁平 map → 迁移为「默认」配置
+        if let legacy = try? JSONDecoder().decode([String: Action].self, from: data) {
+            profiles = ["默认": BindingStore.decodeBindings(legacy)]
+            appRules = [:]
+            activeProfile = "默认"
+            logLine("config migrated v1 -> v2: \(legacy.count) 项")
+            save()
+            return
+        }
+
+        profiles = ["默认": BindingStore.defaultBindings()]
+        save()
     }
 
     private func save() {
-        var out: [String: Action] = [:]
-        for (control, action) in map {
-            out[String(format: "%02x", control.rawValue)] = action
+        var encoded: [String: [String: Action]] = [:]
+        for (name, map) in profiles {
+            encoded[name] = BindingStore.encodeBindings(map)
         }
-        if let data = try? JSONEncoder().encode(out) {
+        let config = ConfigFile(version: 2, activeProfile: activeProfile, profiles: encoded, appRules: appRules)
+        if let data = try? JSONEncoder().encode(config) {
             try? data.write(to: storeURL)
         }
     }
 
+    private static func encodeBindings(_ map: [Control: Action]) -> [String: Action] {
+        var out: [String: Action] = [:]
+        for (control, action) in map {
+            out[String(format: "%02x", control.rawValue)] = action
+        }
+        return out
+    }
+
+    private static func decodeBindings(_ raw: [String: Action]) -> [Control: Action] {
+        var out: [Control: Action] = [:]
+        for (key, action) in raw {
+            if let value = UInt8(key, radix: 16), let control = Control.from(id: value) {
+                out[control] = action
+            }
+        }
+        return out
+    }
+
+    private static func defaultBindings() -> [Control: Action] {
+        [
+            .rotateCW: Action(kind: .media, media: MediaKey.volumeUp.rawValue),
+            .rotateCCW: Action(kind: .media, media: MediaKey.volumeDown.rawValue),
+            .knobClick: Action(kind: .media, media: MediaKey.mute.rawValue),
+        ]
+    }
+
     var configPath: String { storeURL.path }
+}
+
+struct ConfigFile: Codable {
+    var version: Int
+    var activeProfile: String?
+    var profiles: [String: [String: Action]]
+    var appRules: [String: String]?
 }

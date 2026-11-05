@@ -1,12 +1,10 @@
 import SwiftUI
 
-/// 设备俯视图（参考官方布局）：机身居中，每个控件旁边浮一个标签显示当前绑定
+/// 设备俯视图：机身居中，每个控件旁浮一个绑定标签；点击任意控件弹出编辑面板
 struct DeviceTopView: View {
     @ObservedObject var store: BindingStore
     @Binding var selection: SettingsView.Selection
     @Binding var editing: Control?
-
-    private let chipW: CGFloat = 104
 
     private func popoverBinding(_ control: Control) -> Binding<Bool> {
         Binding(
@@ -27,56 +25,57 @@ struct DeviceTopView: View {
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
-            let bw = min(w * 0.44, h * 0.70)
+            let bw = min(w * 0.46, h * 0.70)
             let bh = bw
             let cx = w * 0.5
-            let cy = h * 0.50
+            let cy = h * 0.52
             let x0 = cx - bw / 2
             let y0 = cy - bh / 2
+            let chipW = min(96, max(62, bw * 0.175))
 
             ZStack {
                 // 机身
-                RoundedRectangle(cornerRadius: bw * 0.16, style: .continuous)
+                RoundedRectangle(cornerRadius: bw * 0.17, style: .continuous)
                     .fill(
                         LinearGradient(
-                            colors: [Color(nsColor: .controlBackgroundColor), Color(nsColor: .windowBackgroundColor)],
+                            colors: [Color.white, Color(nsColor: .windowBackgroundColor)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: bw * 0.16, style: .continuous)
-                            .stroke(Color(nsColor: .separatorColor).opacity(0.85), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: bw * 0.17, style: .continuous)
+                            .stroke(Color.black.opacity(0.06), lineWidth: 1)
                     )
-                    .shadow(color: .black.opacity(0.10), radius: 16, y: 8)
+                    .shadow(color: .black.opacity(0.10), radius: 18, y: 9)
                     .frame(width: bw, height: bh)
                     .position(x: cx, y: cy)
 
                 // 顶部三键
-                key(.topLeft, cx: x0 + bw * 0.30, cy: y0 + bh * 0.135, w: bw * 0.17, h: bh * 0.11)
-                key(.topMiddle, cx: x0 + bw * 0.50, cy: y0 + bh * 0.135, w: bw * 0.17, h: bh * 0.11)
-                key(.topRight, cx: x0 + bw * 0.70, cy: y0 + bh * 0.135, w: bw * 0.17, h: bh * 0.11)
+                key(.topLeft, cx: x0 + bw * 0.30, cy: y0 + bh * 0.15, w: bw * 0.18, h: bh * 0.115)
+                key(.topMiddle, cx: x0 + bw * 0.50, cy: y0 + bh * 0.15, w: bw * 0.18, h: bh * 0.115)
+                key(.topRight, cx: x0 + bw * 0.70, cy: y0 + bh * 0.15, w: bw * 0.18, h: bh * 0.115)
 
                 // 四个侧键
-                key(.sideUpperLeft, cx: x0 + bw * 0.10, cy: y0 + bh * 0.36, w: bw * 0.085, h: bh * 0.13)
-                key(.sideLowerLeft, cx: x0 + bw * 0.10, cy: y0 + bh * 0.66, w: bw * 0.085, h: bh * 0.13)
-                key(.sideUpperRight, cx: x0 + bw * 0.90, cy: y0 + bh * 0.36, w: bw * 0.085, h: bh * 0.13)
-                key(.sideLowerRight, cx: x0 + bw * 0.90, cy: y0 + bh * 0.66, w: bw * 0.085, h: bh * 0.13)
+                key(.sideUpperLeft, cx: x0 + bw * 0.085, cy: y0 + bh * 0.37, w: bw * 0.085, h: bh * 0.135)
+                key(.sideLowerLeft, cx: x0 + bw * 0.085, cy: y0 + bh * 0.64, w: bw * 0.085, h: bh * 0.135)
+                key(.sideUpperRight, cx: x0 + bw * 0.915, cy: y0 + bh * 0.37, w: bw * 0.085, h: bh * 0.135)
+                key(.sideLowerRight, cx: x0 + bw * 0.915, cy: y0 + bh * 0.64, w: bw * 0.085, h: bh * 0.135)
 
-                // 旋钮
-                knob(cx: cx, cy: cy, r: bw * 0.255)
+                // 旋钮：整块一个可点击区域
+                knob(cx: cx, cy: cy + bh * 0.01, r: bw * 0.27)
 
-                // 标签
-                chip(.topLeft, x: x0 + bw * 0.30, y: y0 - 22)
-                chip(.topMiddle, x: x0 + bw * 0.50, y: y0 - 22)
-                chip(.topRight, x: x0 + bw * 0.70, y: y0 - 22)
+                // 绑定标签
+                chip(.topLeft, x: x0 + bw * 0.30, y: y0 - 20, width: chipW)
+                chip(.topMiddle, x: x0 + bw * 0.50, y: y0 - 20, width: chipW)
+                chip(.topRight, x: x0 + bw * 0.70, y: y0 - 20, width: chipW)
 
-                chip(.sideUpperLeft, x: x0 - chipW / 2 - 16, y: y0 + bh * 0.36)
-                chip(.sideLowerLeft, x: x0 - chipW / 2 - 16, y: y0 + bh * 0.66)
-                chip(.sideUpperRight, x: x0 + bw + chipW / 2 + 16, y: y0 + bh * 0.36)
-                chip(.sideLowerRight, x: x0 + bw + chipW / 2 + 16, y: y0 + bh * 0.66)
+                chip(.sideUpperLeft, x: x0 - chipW / 2 - 14, y: y0 + bh * 0.37, width: chipW)
+                chip(.sideLowerLeft, x: x0 - chipW / 2 - 14, y: y0 + bh * 0.64, width: chipW)
+                chip(.sideUpperRight, x: x0 + bw + chipW / 2 + 14, y: y0 + bh * 0.37, width: chipW)
+                chip(.sideLowerRight, x: x0 + bw + chipW / 2 + 14, y: y0 + bh * 0.64, width: chipW)
 
-                chip(.knobClick, x: cx, y: cy - bw * 0.255 - 18)
+                chip(.knobClick, x: cx, y: cy - bw * 0.27 - 24, width: chipW + 6)
             }
         }
     }
@@ -84,24 +83,25 @@ struct DeviceTopView: View {
     // MARK: 按键
 
     private func key(_ control: Control, cx: CGFloat, cy: CGFloat, w: CGFloat, h: CGFloat) -> some View {
-        let selected = selection == .control(control)
+        let selected = isSelected(control)
         let bound = store.binding(control).kind != .none
 
-        return RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(selected ? Color.accentColor.opacity(0.16) : Color(nsColor: .textBackgroundColor))
+        return RoundedRectangle(cornerRadius: 7, style: .continuous)
+            .fill(selected ? Color.accentColor.opacity(0.12) : Color.white)
             .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(selected ? Color.accentColor : Color(nsColor: .separatorColor), lineWidth: selected ? 2 : 1)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(selected ? Color.accentColor.opacity(0.85) : Color.black.opacity(0.10),
+                            lineWidth: selected ? 1.8 : 1)
             )
             .overlay(alignment: .topTrailing) {
                 if bound {
-                    Circle().fill(Color.accentColor).frame(width: 5, height: 5).padding(4)
+                    Circle().fill(Color.accentColor).frame(width: 5, height: 5).padding(5)
                 }
             }
             .frame(width: w, height: h)
-            .shadow(color: .black.opacity(0.06), radius: 2, y: 1)
+            .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
             .position(x: cx, y: cy)
-            .onTapGesture { selection = .control(control); editing = control }
+            .onTapGesture { open(control) }
             .popover(isPresented: popoverBinding(control), arrowEdge: arrowEdge(for: control)) {
                 ControlEditorCard(store: store, control: control) { editing = nil }
             }
@@ -110,107 +110,87 @@ struct DeviceTopView: View {
 
     // MARK: 标签
 
-    private func chip(_ control: Control, x: CGFloat, y: CGFloat) -> some View {
-        let selected = selection == .control(control)
+    private func chip(_ control: Control, x: CGFloat, y: CGFloat, width: CGFloat) -> some View {
+        let selected = isSelected(control)
         let text = store.binding(control).describe
 
         return Button {
-            selection = .control(control)
-            editing = control
+            open(control)
         } label: {
             HStack(spacing: 4) {
-                Image(systemName: control == .knobClick ? "circle.circle" : "square.text.square")
+                Image(systemName: control == .knobClick ? "circle.dotted" : "square.text.square")
                     .font(.system(size: 9))
-                    .foregroundStyle(selected ? Color.white : Color.secondary)
+                    .foregroundStyle(selected ? Color.white.opacity(0.9) : Color.secondary)
                 Text(text)
                     .font(.system(size: 10, weight: selected ? .semibold : .regular))
                     .lineLimit(1)
+                    .truncationMode(.middle)
                     .foregroundStyle(selected ? Color.white : Color.primary)
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 7)
             .padding(.vertical, 4)
-            .frame(width: chipW)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(selected ? Color.accentColor : Color(nsColor: .textBackgroundColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(selected ? Color.accentColor : Color(nsColor: .separatorColor), lineWidth: 1)
-            )
+            .frame(width: width)
+            .glassCapsule()
+            .overlay(Capsule().stroke(selected ? Color.accentColor : Color.white.opacity(0.45), lineWidth: selected ? 1.4 : 0.8))
+            .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
         }
         .buttonStyle(.plain)
         .position(x: x, y: y)
-        .popover(isPresented: popoverBinding(control), arrowEdge: arrowEdge(for: control)) {
-            ControlEditorCard(store: store, control: control) { editing = nil }
-        }
         .help(control.name)
     }
 
     // MARK: 旋钮
 
     private func knob(cx: CGFloat, cy: CGFloat, r: CGFloat) -> some View {
-        ZStack {
+        let selected = isSelected(.knobClick)
+
+        return ZStack {
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [Color(nsColor: .textBackgroundColor), Color(nsColor: .controlBackgroundColor)],
-                        center: .topLeading,
+                        colors: [Color.white, Color(nsColor: .controlBackgroundColor)],
+                        center: UnitPoint(x: 0.35, y: 0.3),
                         startRadius: 2,
                         endRadius: r * 1.5
                     )
                 )
-                .overlay(Circle().stroke(Color(nsColor: .separatorColor), lineWidth: 1))
-                .frame(width: r * 2, height: r * 2)
-                .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
-
-            ringButton(.rotateCCW, symbol: "chevron.left", x: cx - r - 15, y: cy, side: 24)
-            ringButton(.rotateCW, symbol: "chevron.right", x: cx + r + 15, y: cy, side: 24)
-            ringButton(.knobHoldCCW, symbol: "arrow.counterclockwise", x: cx - r * 0.58, y: cy, side: 20)
-            ringButton(.knobHoldCW, symbol: "arrow.clockwise", x: cx + r * 0.58, y: cy, side: 20)
-
-            // 中心按下
-            Circle()
-                .fill(selection == .control(.knobClick) ? Color.accentColor.opacity(0.18) : Color(nsColor: .windowBackgroundColor))
                 .overlay(
-                    Circle().stroke(
-                        selection == .control(.knobClick) ? Color.accentColor : Color(nsColor: .separatorColor),
-                        lineWidth: selection == .control(.knobClick) ? 2 : 1
-                    )
+                    Circle().stroke(selected ? Color.accentColor.opacity(0.85) : Color.black.opacity(0.08),
+                                    lineWidth: selected ? 2 : 1)
                 )
-                .overlay(Image(systemName: "circle.circle").font(.system(size: 10)).foregroundStyle(.secondary))
-                .frame(width: r * 0.56, height: r * 0.56)
-                .position(x: cx, y: cy)
-                .onTapGesture { selection = .control(.knobClick); editing = .knobClick }
-                .popover(isPresented: popoverBinding(.knobClick), arrowEdge: .top) {
-                    ControlEditorCard(store: store, control: .knobClick) { editing = nil }
-                }
+                .frame(width: r * 2, height: r * 2)
+                .shadow(color: .black.opacity(0.12), radius: 12, y: 5)
+
+            Circle()
+                .fill(Color(nsColor: .windowBackgroundColor))
+                .overlay(Circle().stroke(Color.black.opacity(0.05), lineWidth: 1))
+                .frame(width: r * 1.18, height: r * 1.18)
+
+            VStack(spacing: 2) {
+                Image(systemName: "dial.medium")
+                    .font(.system(size: 15, weight: .light))
+                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                Text("旋钮")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
         }
+        .contentShape(Circle())
+        .onTapGesture { open(.knobClick) }
+        .popover(isPresented: popoverBinding(.knobClick), arrowEdge: .top) {
+            ControlEditorCard(store: store, control: .knobClick) { editing = nil }
+        }
+        .help("按下 / 旋转 / 按住旋转")
     }
 
-    private func ringButton(_ control: Control, symbol: String, x: CGFloat, y: CGFloat, side: CGFloat) -> some View {
-        let selected = selection == .control(control)
-        let bound = store.binding(control).kind != .none
+    // MARK: 辅助
 
-        return Circle()
-            .fill(selected ? Color.accentColor : Color(nsColor: .textBackgroundColor))
-            .overlay(Circle().stroke(selected ? Color.accentColor : Color(nsColor: .separatorColor), lineWidth: 1))
-            .overlay(
-                Image(systemName: symbol)
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(selected ? Color.white : Color.secondary)
-            )
-            .overlay(alignment: .topTrailing) {
-                if bound && !selected {
-                    Circle().fill(Color.accentColor).frame(width: 4, height: 4).padding(0.5)
-                }
-            }
-            .frame(width: side, height: side)
-            .position(x: x, y: y)
-            .onTapGesture { selection = .control(control); editing = control }
-            .popover(isPresented: popoverBinding(control), arrowEdge: arrowEdge(for: control)) {
-                ControlEditorCard(store: store, control: control) { editing = nil }
-            }
-            .help(control.name)
+    private func isSelected(_ control: Control) -> Bool {
+        selection == .control(control)
+    }
+
+    private func open(_ control: Control) {
+        selection = .control(control)
+        editing = control
     }
 }

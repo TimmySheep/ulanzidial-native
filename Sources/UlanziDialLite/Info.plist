@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>UlanziDialLite</string>
+    <string>DialNative</string>
     <key>CFBundleDisplayName</key>
-    <string>Ulanzi Dial Lite</string>
+    <string>DialNative</string>
     <key>CFBundleIdentifier</key>
-    <string>local.timmy.ulanzidiallite</string>
+    <string>local.timmy.dialnative</string>
     <key>CFBundleExecutable</key>
-    <string>UlanziDialLite</string>
+    <string>DialNative</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

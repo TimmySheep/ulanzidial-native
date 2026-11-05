@@ -1,6 +1,7 @@
 import AppKit
 import Carbon.HIToolbox
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @ObservedObject var store: BindingStore
@@ -19,6 +20,8 @@ struct SettingsView: View {
     @State private var trusted = Actions.isAccessibilityGranted()
     @State private var loginEnabled = LoginItem.isEnabled
     @State private var loginNote: String?
+    @State private var creatingProfile = false
+    @State private var newProfileName = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -27,10 +30,23 @@ struct SettingsView: View {
 
             if selection == .general {
                 generalPane
+                    .background(
+                        LinearGradient(
+                            colors: [Color(red: 0.96, green: 0.97, blue: 1.0), Color(red: 0.92, green: 0.93, blue: 0.99)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
             } else {
                 DeviceTopView(store: store, selection: $selection, editing: $editing)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(nsColor: .underPageBackgroundColor).opacity(0.35))
+                    .background(
+                        LinearGradient(
+                            colors: [Color(red: 0.96, green: 0.97, blue: 1.0), Color(red: 0.90, green: 0.92, blue: 0.99)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
         }
         .frame(minWidth: 900, minHeight: 620)
@@ -39,13 +55,20 @@ struct SettingsView: View {
             trusted = Actions.isAccessibilityGranted()
             loginEnabled = LoginItem.isEnabled
         }
+        .alert("新建配置", isPresented: $creatingProfile) {
+            TextField("配置名称", text: $newProfileName)
+            Button("创建") { store.addProfile(newProfileName) }
+            Button("取消", role: .cancel) { }
+        } message: {
+            Text("新配置初始为空，可以单独为它设置每个按键。")
+        }
     }
 
     // MARK: 顶栏
 
     private var topBar: some View {
         HStack(spacing: 12) {
-            Text("Ulanzi Dial").font(.system(size: 17, weight: .semibold))
+            Text("DialNative").font(.system(size: 17, weight: .semibold))
 
             HStack(spacing: 5) {
                 Circle()
@@ -70,15 +93,46 @@ struct SettingsView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 
-            Button {
-                selection = selection == .general ? .control(.topLeft) : .general
-                editing = nil
-                if recordingHotKey { stopMonitor(); recordingHotKey = false }
-            } label: {
-                Label(selection == .general ? "返回按键" : "通用", systemImage: "gearshape")
-                    .font(.system(size: 12))
+            if selection != .general {
+                Menu {
+                    ForEach(store.profileNames, id: \.self) { name in
+                        Button {
+                            store.switchTo(name)
+                        } label: {
+                            if name == store.activeProfile {
+                                Label(name, systemImage: "checkmark")
+                            } else {
+                                Text(name)
+                            }
+                        }
+                    }
+                    Divider()
+                    Button("新建配置…") {
+                        newProfileName = ""
+                        creatingProfile = true
+                    }
+                    Button("删除当前配置") {
+                        store.deleteProfile(store.activeProfile)
+                    }
+                    .disabled(store.activeProfile == "默认")
+                } label: {
+                    Label(store.activeProfile, systemImage: "square.stack.3d.up")
+                        .font(.system(size: 12))
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+
+                Button {
+                    selection = .general
+                    editing = nil
+                    if recordingHotKey { stopMonitor(); recordingHotKey = false }
+                } label: {
+                    Label("通用", systemImage: "gearshape")
+                        .font(.system(size: 12))
+                }
+                .controlSize(.small)
             }
-            .controlSize(.small)
 
             Button {
                 link.reconnect()
@@ -90,6 +144,7 @@ struct SettingsView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
+        .glassBar()
     }
 
     // MARK: 通用
@@ -97,6 +152,14 @@ struct SettingsView: View {
     private var generalPane: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                Button {
+                    selection = .control(.topLeft)
+                } label: {
+                    Label("返回按键设置", systemImage: "chevron.left")
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(.link)
+
                 Text("通用").font(.system(size: 20, weight: .semibold))
 
                 Divider()
@@ -194,6 +257,56 @@ struct SettingsView: View {
 
                 Divider()
 
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 12) {
+                        Text("应用规则")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 84, alignment: .leading)
+                        Text("切到指定 App 时自动套用对应配置")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("添加规则…") { addAppRule() }
+                            .controlSize(.small)
+                    }
+
+                    if store.appRules.isEmpty {
+                        Text("还没有规则：所有 App 都使用「默认」配置")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 96)
+                    }
+
+                    ForEach(store.appRules.keys.sorted(), id: \.self) { bundle in
+                        HStack(spacing: 10) {
+                            Image(systemName: "app")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                            Text(appDisplayName(bundle))
+                                .font(.system(size: 12))
+                                .frame(width: 190, alignment: .leading)
+                                .lineLimit(1)
+                            Picker("", selection: ruleBinding(bundle)) {
+                                ForEach(store.profileNames, id: \.self) { Text($0).tag($0) }
+                            }
+                            .labelsHidden()
+                            .controlSize(.small)
+                            .frame(width: 150)
+                            Button {
+                                store.removeRule(bundleID: bundle)
+                            } label: {
+                                Image(systemName: "trash").font(.system(size: 10))
+                            }
+                            .buttonStyle(.borderless)
+                            Spacer()
+                        }
+                        .padding(.leading, 96)
+                    }
+                }
+
+                Divider()
+
                 HStack(spacing: 12) {
                     Text("其他")
                         .font(.system(size: 12))
@@ -209,6 +322,36 @@ struct SettingsView: View {
                     .textSelection(.enabled)
             }
             .padding(24)
+        }
+    }
+
+    // MARK: 应用规则
+
+    private func ruleBinding(_ bundle: String) -> Binding<String> {
+        Binding(
+            get: { store.appRules[bundle] ?? store.activeProfile },
+            set: { store.setRule(bundleID: bundle, profile: $0) }
+        )
+    }
+
+    private func appDisplayName(_ bundle: String) -> String {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) {
+            return FileManager.default.displayName(atPath: url.path)
+        }
+        return bundle
+    }
+
+    private func addAppRule() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.applicationBundle]
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.message = "选择要绑定配置的应用"
+        panel.prompt = "绑定"
+        if panel.runModal() == .OK, let url = panel.url, let bundle = Bundle(url: url)?.bundleIdentifier {
+            store.setRule(bundleID: bundle, profile: store.activeProfile)
         }
     }
 
@@ -230,23 +373,40 @@ struct SettingsView: View {
     private func startHotKeyRecording() {
         stopMonitor()
         recordingHotKey = true
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
-            if event.keyCode == 53 { stopMonitor(); recordingHotKey = false; return nil }
-            if event.isARepeat { return nil }
+
+        let apply: (NSEvent) -> Void = { event in
+            if event.keyCode == 53 {
+                KeyCapture.shared.stop()
+                stopMonitor()
+                recordingHotKey = false
+                return
+            }
+            if event.isARepeat { return }
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            guard flags.carbonModifiers != 0 else { return nil }
+            guard flags.carbonModifiers != 0 else { return }
             settings.hotKeyCode = event.keyCode
             settings.hotKeyCarbonModifiers = flags.carbonModifiers
             settings.hotKeyLabel = KeyLabel.describe(event)
             settings.hotKeyEnabled = true
             HotKeyCenter.shared.apply(settings: settings)
+            KeyCapture.shared.stop()
             stopMonitor()
             recordingHotKey = false
-            return nil
+        }
+
+        if KeyCapture.shared.start() {
+            KeyCapture.shared.onKey = apply
+        } else {
+            monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
+                apply(event)
+                return nil
+            }
         }
     }
 
     private func stopMonitor() {
+        KeyCapture.shared.onKey = nil
+        KeyCapture.shared.stop()
         if let m = monitor {
             NSEvent.removeMonitor(m)
             monitor = nil
