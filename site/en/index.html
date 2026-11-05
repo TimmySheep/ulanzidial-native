@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UlanziDial Native — a native macOS client for the Ulanzi D100H</title>
+<meta name="description" content="A lightweight native replacement for Ulanzi Studio: 12 customizable slots, ~1 MB bundle, ~37 MB memory, no 1 GB app required.">
+<link rel="icon" href="../assets/icon.png">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="../"><img src="../assets/icon.png" alt=""> UlanziDial Native</a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#compare">Compare</a>
+      <a href="#protocol">How it works</a>
+      <a href="#build">Build</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <a class="lang" href="../">中文</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <span class="eyebrow">Unofficial · Native macOS</span>
+      <h1><span>Give the dial</span><span>its own app</span></h1>
+      <p class="lead">
+        The Ulanzi D100H has seven keys and a dial. The official app carries Chromium, Node and a full
+        Qt stack for its plugin ecosystem: 1 GB on disk, ~500 MB resident.<br>
+        This project does only the part you actually use — <strong>bind one action to each of 12 slots</strong>.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://github.com/TimmySheep/ulanzidial-native" target="_blank" rel="noopener">View source on GitHub</a>
+        <a class="btn btn-ghost" href="#build">How to build</a>
+      </div>
+      <div class="hero-meta">
+        <span>~1 MB bundle</span>
+        <span>~37 MB resident</span>
+        <span>Zero dependencies</span>
+      </div>
+    </div>
+    <div class="icon-stage">
+      <img src="../assets/icon.png" alt="UlanziDial Native icon">
+      <span class="icon-badge">Liquid Glass · macOS 26</span>
+    </div>
+  </div>
+</header>
+
+<section class="section" id="features">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>What it does</h2>
+      <p>No plugin market, no lighting control — just "key → action", done cleanly and cheaply.</p>
+    </div>
+
+    <div class="feature">
+      <div class="feature-copy">
+        <h3>12 slots, all customizable</h3>
+        <p>Three top keys, four side keys, dial press, dial rotate clockwise / counter-clockwise, and
+           press-and-rotate in both directions. Each slot is bound independently.</p>
+      </div>
+      <div class="feature-art">
+        <svg class="dial-svg" viewBox="0 0 320 260" role="img" aria-label="Device layout">
+          <rect x="40" y="20" width="240" height="220" rx="40" fill="#fff" stroke="rgba(0,0,0,.08)"/>
+          <rect class="key" x="86" y="52" width="44" height="26" rx="6"/>
+          <rect class="key" x="138" y="52" width="44" height="26" rx="6"/>
+          <rect class="key" x="190" y="52" width="44" height="26" rx="6"/>
+          <rect class="key" x="54" y="110" width="22" height="38" rx="6"/>
+          <rect class="key" x="54" y="158" width="22" height="38" rx="6"/>
+          <rect class="key" x="244" y="110" width="22" height="38" rx="6"/>
+          <rect class="key" x="244" y="158" width="22" height="38" rx="6"/>
+          <defs>
+            <radialGradient id="knobGrad" cx="35%" cy="30%">
+              <stop offset="0" stop-color="#ffffff"/>
+              <stop offset="1" stop-color="#e9e9f5"/>
+            </radialGradient>
+          </defs>
+          <circle class="knob" cx="160" cy="150" r="54"/>
+          <circle class="knob-inner" cx="160" cy="150" r="30"/>
+          <text x="160" y="154" text-anchor="middle" font-size="10" fill="#5d6070">DIAL</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="feature flip">
+      <div class="feature-copy">
+        <h3>9 action kinds</h3>
+        <p>Keyboard shortcuts (including system-reserved ones like ⌥⌘Tab), media keys, type text,
+           open an app, open a URL or file, run a command, system actions, multi-step sequences, and none.</p>
+      </div>
+      <div class="feature-art">
+        <div class="actions-grid">
+          <div class="action-card"><strong>Shortcut</strong><span>Any combination, recorded</span></div>
+          <div class="action-card"><strong>Media keys</strong><span>Volume, mute, play, brightness</span></div>
+          <div class="action-card"><strong>Type text</strong><span>Insert a whole string</span></div>
+          <div class="action-card"><strong>Open app</strong><span>Launch directly</span></div>
+          <div class="action-card"><strong>Run command</strong><span>zsh -lc, scriptable</span></div>
+          <div class="action-card"><strong>System</strong><span>Lock, sleep, screenshot, Mission Control</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="feature">
+      <div class="feature-copy">
+        <h3>Sequences and profiles</h3>
+        <p>A single key can run several actions in order, with a wait between steps. You can also keep
+           several profiles and attach them to apps — switch to your editor and the mapping changes with it.</p>
+      </div>
+      <div class="feature-art">
+        <pre><code>"Top left key"
+  └ Multi-step
+      1. ⌘S            wait 200 ms
+      2. type "render" wait 120 ms
+      3. ⌘↩           done</code></pre>
+      </div>
+    </div>
+
+    <div class="feature flip">
+      <div class="feature-copy">
+        <h3>Completely invisible</h3>
+        <p>No Dock icon, no menu bar item. It runs as a background process; <code>⌥⌘D</code> (configurable)
+           opens settings, closing the window keeps it running. Launch at login uses Apple's
+           <code>SMAppService</code>.</p>
+      </div>
+      <div class="feature-art">
+        <pre><code>⌥⌘D        →  settings window
+close window →  still running
+quit         →  nothing left behind</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="compare">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Why rewrite it</h2>
+      <p>The official app's footprint isn't the feature cost — it's the plugin ecosystem: an embedded
+         Chromium to render plugin panels, Node to execute plugin logic.</p>
+    </div>
+    <table class="compare">
+      <thead><tr><th>Item</th><th>Ulanzi Studio</th><th>UlanziDial Native</th></tr></thead>
+      <tbody>
+        <tr><td>Bundle size</td><td>1.0 GB</td><td class="good">~1 MB</td></tr>
+        <tr><td>Resident memory</td><td>~500 MB</td><td class="good">~37 MB</td></tr>
+        <tr><td>Runtime</td><td>Chromium + Node + Qt</td><td class="good">System frameworks</td></tr>
+        <tr><td>UI</td><td>Dark engineering style</td><td class="good">Native macOS (Liquid Glass)</td></tr>
+        <tr><td>Plugin market / OBS / lights</td><td>Yes</td><td>No (core binding only)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section" id="protocol">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>How it works</h2>
+      <p>The device speaks a proprietary BLE protocol. The community has reverse-engineered it and
+         verified each finding (firmware 1.3.8.1).</p>
+    </div>
+    <div class="feature">
+      <div class="feature-copy">
+        <h3>Online mode</h3>
+        <p>A heartbeat every second puts the device into "online mode": it reports raw key events
+           (encrypted) and suppresses its built-in volume/media behaviour. About three seconds after
+           heartbeats stop, it falls back to standalone HID mode.</p>
+      </div>
+      <div class="feature-art">
+        <pre><code>service  0x1971
+write    fd01     ← commands / heartbeat
+notify   fd00     → key events
+cipher   original TEA, 32 rounds
+         20-byte packets, first 16 encrypted
+event    8b 10 &lt;ID&gt; &lt;STATE&gt;</code></pre>
+      </div>
+    </div>
+    <details open>
+      <summary>How is the battery level read?</summary>
+      <p>Not from the vendor's occasional pushes — the app reads the standard GATT battery
+         characteristic (0x2A19) on connect, then subscribes to changes.</p>
+    </details>
+    <details>
+      <summary>Why does it need Accessibility permission?</summary>
+      <p>Synthesizing keys means injecting events with <code>CGEvent</code>; recording shortcuts that the
+         system reserves (like ⌥⌘Tab) needs a <code>CGEventTap</code>. Both require Accessibility.</p>
+    </details>
+  </div>
+</section>
+
+<section class="section" id="build">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Build it yourself</h2>
+      <p>Requires macOS 13+ (Liquid Glass needs macOS 26) and the Xcode command line tools.
+         No prebuilt binaries are shipped.</p>
+    </div>
+    <pre><code>git clone https://github.com/TimmySheep/ulanzidial-native.git
+cd ulanzidial-native
+
+./scripts/build.sh            # build (signs if a certificate exists, else ad-hoc)
+./scripts/install-local.sh    # build + sign + install to /Applications
+./scripts/release.sh          # build + Developer ID sign + notarize</code></pre>
+    <p style="margin-top:16px;color:var(--muted)">
+      On first launch it asks for <strong>Bluetooth</strong> (device access) and
+      <strong>Accessibility</strong> (synthesizing keys).
+    </p>
+  </div>
+</section>
+
+<section class="section" id="faq">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>FAQ</h2>
+      <p>Limitations first, so nobody is surprised.</p>
+    </div>
+    <details><summary>Can I run it alongside Ulanzi Studio?</summary>
+      <p>No. Both compete for the same BLE device — pick one.</p></details>
+    <details><summary>Does it support other Ulanzi devices?</summary>
+      <p>Only verified on the D100H, firmware 1.3.8.1. Other models may use a different protocol.</p></details>
+    <details><summary>Why no OBS / lighting / pixel clock?</summary>
+      <p>Those are official plugins, each needing its own implementation (OBS over WebSocket, lighting is
+         a separate BLE protocol). This project is core binding only.</p></details>
+    <details><summary>License?</summary>
+      <p>MIT. "Ulanzi" is a trademark of Shenzhen Ulanzi Technology Co., Ltd., used here only to describe
+         compatible hardware.</p></details>
+    <details><summary>Is this official software?</summary>
+      <p>No. It's a personal, unofficial replacement, unaffiliated with Ulanzi, containing none of the
+         official app's assets.</p></details>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <span>UlanziDial Native · Unofficial · MIT</span>
+    <span>
+      <a href="https://github.com/TimmySheep/ulanzidial-native" target="_blank" rel="noopener">GitHub</a>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/TimmySheep/ulanzidial-native/issues" target="_blank" rel="noopener">Issues</a>
+      &nbsp;·&nbsp;
+      <a href="../">中文</a>
+    </span>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UlanziDial Native — 给 Ulanzi D100H 的原生 macOS 客户端</title>
+<meta name="description" content="Ulanzi D100H 旋钮控制器的轻量原生替代客户端：12 个可自定义槽位，1 MB 包体、37 MB 内存，不装 1 GB 的官方软件。">
+<link rel="icon" href="assets/icon.png">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="./"><img src="assets/icon.png" alt=""> UlanziDial Native</a>
+    <div class="nav-links">
+      <a href="#features">功能</a>
+      <a href="#compare">对比</a>
+      <a href="#protocol">原理</a>
+      <a href="#build">构建</a>
+      <a href="#faq">常见问题</a>
+    </div>
+    <a class="lang" href="en/">English</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <span class="eyebrow">Unofficial · macOS 原生</span>
+      <h1><span>给旋钮一个</span><span>自己的软件</span></h1>
+      <p class="lead">
+        Ulanzi D100H 有 7 个键和一个旋钮。官方软件为了插件生态背了 Chromium、Node 和整套 Qt，
+        1 GB 包体、约 500 MB 内存。<br>
+        这个项目只做你真正用的那一层：<strong>给 12 个可控位置各绑一个动作</strong>。
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://github.com/TimmySheep/ulanzidial-native" target="_blank" rel="noopener">在 GitHub 查看源码</a>
+        <a class="btn btn-ghost" href="#build">如何构建</a>
+      </div>
+      <div class="hero-meta">
+        <span>约 1 MB 包体</span>
+        <span>约 37 MB 常驻内存</span>
+        <span>零第三方依赖</span>
+      </div>
+    </div>
+    <div class="icon-stage">
+      <img src="assets/icon.png" alt="UlanziDial Native 图标">
+      <span class="icon-badge">Liquid Glass · macOS 26</span>
+    </div>
+  </div>
+</header>
+
+<section class="section" id="features">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>它做什么</h2>
+      <p>不做插件市场，不做灯光控制，只把「按键 → 动作」这件事做到干净、快、不占资源。</p>
+    </div>
+
+    <div class="feature">
+      <div class="feature-copy">
+        <h3>12 个位置，全部可自定义</h3>
+        <p>顶部三键、四个侧键、旋钮按下、旋钮顺/逆时针、按住旋钮顺/逆时针。每个位置单独绑定，互不干扰。</p>
+      </div>
+      <div class="feature-art">
+        <svg class="dial-svg" viewBox="0 0 320 260" role="img" aria-label="设备布局示意">
+          <rect x="40" y="20" width="240" height="220" rx="40" fill="#fff" stroke="rgba(0,0,0,.08)"/>
+          <rect class="key" x="86" y="52" width="44" height="26" rx="6"/>
+          <rect class="key" x="138" y="52" width="44" height="26" rx="6"/>
+          <rect class="key" x="190" y="52" width="44" height="26" rx="6"/>
+          <rect class="key" x="54" y="110" width="22" height="38" rx="6"/>
+          <rect class="key" x="54" y="158" width="22" height="38" rx="6"/>
+          <rect class="key" x="244" y="110" width="22" height="38" rx="6"/>
+          <rect class="key" x="244" y="158" width="22" height="38" rx="6"/>
+          <defs>
+            <radialGradient id="knobGrad" cx="35%" cy="30%">
+              <stop offset="0" stop-color="#ffffff"/>
+              <stop offset="1" stop-color="#e9e9f5"/>
+            </radialGradient>
+          </defs>
+          <circle class="knob" cx="160" cy="150" r="54"/>
+          <circle class="knob-inner" cx="160" cy="150" r="30"/>
+          <text x="160" y="154" text-anchor="middle" font-size="10" fill="#5d6070">旋钮</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="feature flip">
+      <div class="feature-copy">
+        <h3>9 类动作</h3>
+        <p>键盘快捷键（含被系统预留的 ⌥⌘Tab）、媒体键、输入文字、打开 App、打开网址或文件、运行命令、
+           系统操作、多项操作、无。</p>
+      </div>
+      <div class="feature-art">
+        <div class="actions-grid">
+          <div class="action-card"><strong>键盘快捷键</strong><span>任意组合，录制即用</span></div>
+          <div class="action-card"><strong>系统媒体键</strong><span>音量、静音、播放、亮度</span></div>
+          <div class="action-card"><strong>输入文字</strong><span>整段文本一次插入</span></div>
+          <div class="action-card"><strong>打开 App</strong><span>直接启动，不经过 Finder</span></div>
+          <div class="action-card"><strong>运行命令</strong><span>zsh -lc，可写脚本</span></div>
+          <div class="action-card"><strong>系统操作</strong><span>锁屏、睡眠、截屏、调度中心</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="feature">
+      <div class="feature-copy">
+        <h3>多项操作与多套配置</h3>
+        <p>一个键可以按顺序执行多步动作，每步之间设等待毫秒数；也可以建多套映射，
+           并给指定 App 绑定规则——切到达芬奇自动换一套，切回浏览器自动换回来。</p>
+      </div>
+      <div class="feature-art">
+        <pre><code>「顶部左键」
+  └ 多项操作
+      1. ⌘S            等 200 ms
+      2. 输入「渲染」   等 120 ms
+      3. ⌘↩           完成</code></pre>
+      </div>
+    </div>
+
+    <div class="feature flip">
+      <div class="feature-copy">
+        <h3>完全隐形</h3>
+        <p>不占 Dock，不占菜单栏。平时就是个后台进程，按 <code>⌥⌘D</code>（可改）才弹出设置窗口，
+           关掉窗口继续在后台工作。开机自启走 Apple 官方 <code>SMAppService</code>。</p>
+      </div>
+      <div class="feature-art">
+        <pre><code>⌥⌘D  →  设置窗口
+窗口关闭  →  后台继续工作
+退出  →  菜单栏 / Dock 均无残留</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="compare">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>为什么值得重写</h2>
+      <p>官方软件的资源占用不是功能需要的，是插件生态的代价——内嵌 Chromium 渲染插件面板，Node 跑插件逻辑。</p>
+    </div>
+    <table class="compare">
+      <thead>
+        <tr><th>项目</th><th>Ulanzi Studio</th><th>UlanziDial Native</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>包体</td><td>1.0 GB</td><td class="good">约 1 MB</td></tr>
+        <tr><td>常驻内存</td><td>约 500 MB</td><td class="good">约 37 MB</td></tr>
+        <tr><td>运行时</td><td>Chromium + Node + Qt</td><td class="good">系统框架</td></tr>
+        <tr><td>界面</td><td>深色工程风</td><td class="good">原生 macOS（液态玻璃）</td></tr>
+        <tr><td>插件市场 / OBS / 灯控</td><td>有</td><td>没有（只做核心绑定）</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section" id="protocol">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>它是怎么工作的</h2>
+      <p>设备走 BLE 私有协议；社区已经完整逆向了它，并逐项验证过（测试固件 1.3.8.1）。</p>
+    </div>
+    <div class="feature">
+      <div class="feature-copy">
+        <h3>在线模式</h3>
+        <p>App 每秒发一次心跳，设备就进入「在线模式」：把原始按键事件加密上报，同时抑制固件自带的音量/媒体键行为。
+           停止心跳约 3 秒后，设备自动退回独立 HID 模式。</p>
+      </div>
+      <div class="feature-art">
+        <pre><code>服务  0x1971
+写入  fd01     ← 命令 / 心跳
+通知  fd00     → 按键事件
+加密  原始 TEA，32 轮
+      20 字节包，仅前 16 字节加密
+事件  8b 10 &lt;ID&gt; &lt;STATE&gt;</code></pre>
+      </div>
+    </div>
+    <details open>
+      <summary>那电量是怎么读的？</summary>
+      <p>不依赖厂商那种不定期上报，直接读标准 GATT 电量特征（0x2A19）：连上就读一次，之后订阅变化。</p>
+    </details>
+    <details>
+      <summary>为什么快捷键要占辅助功能权限？</summary>
+      <p>模拟按键要通过 <code>CGEvent</code> 注入系统事件流；录制快捷键时还要用 <code>CGEventTap</code>
+         抓取被系统预留的组合（例如 ⌥⌘Tab），这两个 API 都要求辅助功能授权。</p>
+    </details>
+  </div>
+</section>
+
+<section class="section" id="build">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>自己构建</h2>
+      <p>需要 macOS 13 及以上（液态玻璃效果需要 macOS 26）、Xcode 命令行工具。仓库不含预编译二进制。</p>
+    </div>
+    <pre><code>git clone https://github.com/TimmySheep/ulanzidial-native.git
+cd ulanzidial-native
+
+./scripts/build.sh            # 构建（有证书就签名，没有就 ad-hoc）
+./scripts/install-local.sh    # 构建 + 签名 + 装到 /Applications
+./scripts/release.sh          # 构建 + Developer ID 签名 + 公证</code></pre>
+    <p style="margin-top:16px;color:var(--muted)">
+      首次运行需要授予：<strong>蓝牙</strong>（连接设备）与 <strong>辅助功能</strong>（模拟按键）。
+    </p>
+  </div>
+</section>
+
+<section class="section" id="faq">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>常见问题</h2>
+      <p>先说限制，免得你踩坑。</p>
+    </div>
+    <details><summary>能和 Ulanzi Studio 一起用吗？</summary>
+      <p>不能。两者会争抢同一个 BLE 设备，必须二选一。</p></details>
+    <details><summary>支持别的 Ulanzi 设备吗？</summary>
+      <p>只在 D100H、固件 1.3.8.1 上验证过。协议对其他型号可能不同，未做适配。</p></details>
+    <details><summary>为什么没有 OBS / 灯光控制 / 像素时钟？</summary>
+      <p>那些是官方插件的功能，需要各自单独实现（OBS 要走 WebSocket，灯控是另一套 BLE 协议）。本项目只做核心绑定。</p></details>
+    <details><summary>开源协议是什么？</summary>
+      <p>MIT。名称「Ulanzi」属于深圳优篮子科技，本项目仅在描述兼容硬件时使用。</p></details>
+    <details><summary>这是官方软件吗？</summary>
+      <p>不是。这是个人自用的非官方替代品，与 Ulanzi 无关，也不包含官方软件的任何资源。</p></details>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <span>UlanziDial Native · 非官方项目 · MIT</span>
+    <span>
+      <a href="https://github.com/TimmySheep/ulanzidial-native" target="_blank" rel="noopener">GitHub</a>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/TimmySheep/ulanzidial-native/issues" target="_blank" rel="noopener">反馈</a>
+      &nbsp;·&nbsp;
+      <a href="en/">English</a>
+    </span>
+  </div>
+</footer>
+
+</body>
+</html>
