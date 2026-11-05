@@ -271,6 +271,12 @@ struct SettingsView: View {
                 Button("打开日志") { NSWorkspace.shared.open(logURL) }
                     .buttonStyle(.link)
                     .font(.system(size: 10))
+                Spacer()
+                Text("⌥⌘D 随时呼出此窗口")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                Button("退出 App") { NSApp.terminate(nil) }
+                    .controlSize(.small)
             }
         }
         .padding(.horizontal, 20)
