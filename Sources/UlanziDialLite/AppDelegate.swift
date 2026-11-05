@@ -25,6 +25,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.target = self
         menu.addItem(settings)
 
+        let login = NSMenuItem(title: "开机自动启动", action: #selector(toggleLogin), keyEquivalent: "")
+        login.target = self
+        login.state = LoginItem.isEnabled ? .on : .off
+        menu.addItem(login)
+
+        menu.addItem(.separator())
         let log = NSMenuItem(title: "打开日志", action: #selector(openLog), keyEquivalent: "l")
         log.target = self
         menu.addItem(log)
@@ -77,6 +83,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow = window
+    }
+
+    @objc func toggleLogin() {
+        let enable = !LoginItem.isEnabled
+        if let error = LoginItem.setEnabled(enable) {
+            logLine("开机自启设置失败: \(error)")
+            let alert = NSAlert()
+            alert.messageText = "无法\(enable ? "开启" : "关闭")开机自启"
+            alert.informativeText = error
+            alert.alertStyle = .warning
+            alert.runModal()
+        }
+        statusItem.menu?.item(withTitle: "开机自动启动")?.state = LoginItem.isEnabled ? .on : .off
     }
 
     @objc func openLog() {
