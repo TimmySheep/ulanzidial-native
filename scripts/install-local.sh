@@ -43,13 +43,22 @@ done
 echo "==> 4/5 安装到 $DEST"
 ditto "build/$NAME.app" "$DEST"
 
-echo "==> 5/6 安装命令行工具到 /usr/local/bin"
+echo "==> 5/6 安装命令行工具"
 if [ -w /usr/local/bin ]; then
     cp build/ulanzidial /usr/local/bin/ulanzidial
+    CLI_PATH="/usr/local/bin/ulanzidial"
 else
-    sudo install -m 755 build/ulanzidial /usr/local/bin/ulanzidial
+    mkdir -p "$HOME/.local/bin"
+    cp build/ulanzidial "$HOME/.local/bin/ulanzidial"
+    CLI_PATH="$HOME/.local/bin/ulanzidial"
 fi
-echo "    ulanzidial $(build/ulanzidial status >/dev/null 2>&1 && echo 可用)"
+chmod 755 "$CLI_PATH"
+echo "    已安装：$CLI_PATH"
+case ":$PATH:" in
+    *":$(dirname "$CLI_PATH"):"*) ;;
+    *) echo "    提示：$(dirname "$CLI_PATH") 不在 PATH 里，可加到 ~/.zshrc：
+      export PATH=\"\$HOME/.local/bin:\$PATH\"" ;;
+esac
 
 echo "==> 6/6 启动并验证"
 open "$DEST"

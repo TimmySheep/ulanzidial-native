@@ -179,6 +179,64 @@ func pad(_ text: String, _ width: Int) -> String {
     return count >= width ? text : text + String(repeating: " ", count: width - count)
 }
 
+/// 把「类型 + 参数」翻成 Action；失败直接退出
+func buildAction(type rawType: String, value: String) -> Action {
+    let type = rawType.lowercased()
+    switch type {
+    case "key", "hotkey":
+        guard let combo = parseCombo(value) else { fail("快捷键写法看不懂：\(value)\n例：cmd+shift+4 / opt+tab / f5 / space") }
+        return Action(kind: .key, keyCode: combo.keyCode, modifiers: combo.modifiers, keyLabel: combo.label)
+    case "media":
+        let key = value.lowercased()
+        guard let media = MediaKey.allCases.first(where: { $0.rawValue.lowercased() == key || $0.name.lowercased() == key }) else {
+            fail("不认识的媒体键：\(value)\n可选：\(MediaKey.allCases.map { $0.rawValue }.joined(separator: ", "))")
+        }
+        return Action(kind: .media, media: media.rawValue)
+    case "app":
+        guard !value.isEmpty else { fail("用法：app <路径.app>") }
+        return Action(kind: .app, path: value)
+    case "url":
+        guard !value.isEmpty else { fail("用法：url <网址或文件路径>") }
+        return Action(kind: .url, url: value)
+    case "text":
+        guard !value.isEmpty else { fail("用法：text <要输入的文字>") }
+        return Action(kind: .text, text: value)
+    case "shell":
+        guard !value.isEmpty else { fail("用法：shell <命令>") }
+        return Action(kind: .shell, command: value)
+    case "system":
+        guard let system = SystemAction(rawValue: value) ?? SystemAction.allCases.first(where: { $0.name == value }) else {
+            fail("不认识的系统操作：\(value)\n可选：\(SystemAction.allCases.map { $0.rawValue }.joined(separator: ", "))")
+        }
+        return Action(kind: .system, system: system.rawValue)
+    case "sequence":
+        return Action(kind: .sequence, steps: [])
+    default:
+        fail("未知类型：\(rawType)\n类型：key media app url text shell system sequence")
+    }
+}
+
+/// 修饰键写法：opt / ⌥ / cmd+shift 等
+func modifierLabel(_ mask: UInt) -> String {
+    var out = ""
+    if mask & (1 << 18) != 0 { out += "⌃" }
+    if mask & (1 << 19) != 0 { out += "⌥" }
+    if mask & (1 << 17) != 0 { out += "⇧" }
+    if mask & (1 << 20) != 0 { out += "⌘" }
+    return out
+}
+
+func parseModifierMask(_ raw: String) -> UInt {
+    let parts = raw.replacingOccurrences(of: "+", with: " ").split(separator: " ").map { String($0).lowercased() }
+    var mask: UInt = 0
+    for part in parts {
+        guard let (flag, _) = modifierTable[part] else { fail("不认识的修饰键：\(part)\n可选：ctrl opt shift cmd") }
+        mask |= flag
+    }
+    guard mask != 0 else { fail("修饰键不能为空") }
+    return mask
+}
+
 // MARK: - 命令
 
 var args = Array(CommandLine.arguments.dropFirst())
@@ -238,40 +296,7 @@ case "set":
     let slot = String(format: "%02x", control.rawValue)
     let type = args[2].lowercased()
     let value = args.dropFirst(3).joined(separator: " ")
-    var action = Action.empty
-
-    switch type {
-    case "key", "hotkey":
-        guard let combo = parseCombo(value) else { fail("快捷键写法看不懂：\(value)\n例：cmd+shift+4 / opt+tab / f5 / space") }
-        action = Action(kind: .key, keyCode: combo.keyCode, modifiers: combo.modifiers, keyLabel: combo.label)
-    case "media":
-        let key = value.lowercased()
-        guard let media = MediaKey.allCases.first(where: { $0.rawValue.lowercased() == key || $0.name.lowercased() == key }) else {
-            fail("不认识的媒体键：\(value)\n可选：\(MediaKey.allCases.map { $0.rawValue }.joined(separator: ", "))")
-        }
-        action = Action(kind: .media, media: media.rawValue)
-    case "app":
-        guard !value.isEmpty else { fail("用法：ulanzidial set <槽位> app <路径.app>") }
-        action = Action(kind: .app, path: value)
-    case "url":
-        guard !value.isEmpty else { fail("用法：ulanzidial set <槽位> url <网址或文件路径>") }
-        action = Action(kind: .url, url: value)
-    case "text":
-        guard !value.isEmpty else { fail("用法：ulanzidial set <槽位> text <要输入的文字>") }
-        action = Action(kind: .text, text: value)
-    case "shell":
-        guard !value.isEmpty else { fail("用法：ulanzidial set <槽位> shell <命令>") }
-        action = Action(kind: .shell, command: value)
-    case "system":
-        guard let system = SystemAction(rawValue: value) ?? SystemAction.allCases.first(where: { $0.name == value }) else {
-            fail("不认识的系统操作：\(value)\n可选：\(SystemAction.allCases.map { $0.rawValue }.joined(separator: ", "))")
-        }
-        action = Action(kind: .system, system: system.rawValue)
-    case "sequence":
-        action = Action(kind: .sequence, steps: [])
-    default:
-        fail("未知类型：\(type)\n类型：key media app url text shell system sequence")
-    }
+    let action = buildAction(type: type, value: value)
 
     var config = loadConfig()
     if let p = profileOverride {
@@ -290,6 +315,98 @@ case "clear":
     saveConfig(config)
     logLine("cli clear \(control.name)[\(gesture.name)]")
     print("✓ 已清除 \(control.name) [\(gesture.name)]")
+
+case "chord":
+    guard args.count >= 2 else { fail("用法：ulanzidial chord <add|list|clear> …") }
+    var config = loadConfig()
+    switch args[1] {
+    case "add":
+        guard args.count >= 5 else { fail("用法：ulanzidial chord add <槽位+槽位> <类型> <参数>\n例：ulanzidial chord add 顶部左键+右侧下键 key cmd+shift+5") }
+        let keys = args[2].split(separator: "+").compactMap { parseSlot(String($0)) }
+        guard keys.count >= 2 else { fail("至少两个槽位，例：01+08 或 顶部左键+右侧下键") }
+        let action = buildAction(type: args[3], value: args.dropFirst(4).joined(separator: " "))
+        var chords = config.chords ?? []
+        chords.append(ChordSpec(keys: keys.map { String(format: "%02x", $0.rawValue) }, action: action))
+        config.chords = chords
+        saveConfig(config)
+        print("✓ 组合 \(keys.map { $0.name }.joined(separator: " + ")) → \(action.describe)")
+    case "list":
+        let chords = config.chords ?? []
+        if chords.isEmpty { print("（没有组合）") }
+        for spec in chords { print("• \(spec.describe) → \(spec.action.describe)") }
+    case "clear":
+        config.chords = []
+        saveConfig(config)
+        print("✓ 已清空全部组合")
+    default:
+        fail("用法：ulanzidial chord <add|list|clear> …")
+    }
+
+case "layer":
+    guard args.count >= 2 else { fail("用法：ulanzidial layer <add|list|clear> …") }
+    var config = loadConfig()
+    switch args[1] {
+    case "add":
+        guard args.count >= 6 else { fail("用法：ulanzidial layer add <按住键> <目标槽位> <类型> <参数>\n例：ulanzidial layer add 右侧上键 顶部左键 media mute") }
+        guard let hold = parseSlot(args[2]), let target = parseSlot(args[3]) else { fail("槽位认不出来") }
+        let action = buildAction(type: args[4], value: args.dropFirst(5).joined(separator: " "))
+        var layers = config.layers ?? []
+        let holdID = String(format: "%02x", hold.rawValue)
+        let targetID = String(format: "%02x", target.rawValue)
+        if let index = layers.firstIndex(where: { $0.hold == holdID }) {
+            layers[index].bindings[targetID] = action
+        } else {
+            layers.append(LayerSpec(hold: holdID, bindings: [targetID: action]))
+        }
+        config.layers = layers
+        saveConfig(config)
+        print("✓ 按住 \(hold.name) 时 \(target.name) → \(action.describe)")
+    case "list":
+        let layers = config.layers ?? []
+        if layers.isEmpty { print("（没有功能层）") }
+        for spec in layers {
+            print("• 按住 \(spec.holdName) 时：")
+            for (slot, action) in spec.bindings.sorted(by: { $0.key < $1.key }) {
+                let name = UInt8(slot, radix: 16).flatMap { Control.from(id: $0) }?.name ?? slot
+                print("    \(name) → \(action.describe)")
+            }
+        }
+    case "clear":
+        config.layers = []
+        saveConfig(config)
+        print("✓ 已清空全部功能层")
+    default:
+        fail("用法：ulanzidial layer <add|list|clear> …")
+    }
+
+case "mod":
+    guard args.count >= 2 else { fail("用法：ulanzidial mod <add|list|clear> …") }
+    var config = loadConfig()
+    switch args[1] {
+    case "add":
+        guard args.count >= 6 else { fail("用法：ulanzidial mod add <修饰键> <槽位> <类型> <参数>\n例：ulanzidial mod add opt 旋钮顺时针 media brightnessUp") }
+        let mask = parseModifierMask(args[2])
+        guard let control = parseSlot(args[3]) else { fail("槽位认不出来：\(args[3])") }
+        let action = buildAction(type: args[4], value: args.dropFirst(5).joined(separator: " "))
+        var specs = config.modifierActions ?? []
+        specs.append(ModifierSpec(mask: mask, control: String(format: "%02x", control.rawValue), action: action))
+        config.modifierActions = specs
+        saveConfig(config)
+        print("✓ \(modifierLabel(mask))+\(control.name) → \(action.describe)")
+    case "list":
+        let specs = config.modifierActions ?? []
+        if specs.isEmpty { print("（没有修饰键动作）") }
+        for spec in specs {
+            let name = UInt8(spec.control, radix: 16).flatMap { Control.from(id: $0) }?.name ?? spec.control
+            print("• \(spec.maskLabel)+\(name) → \(spec.action.describe)")
+        }
+    case "clear":
+        config.modifierActions = []
+        saveConfig(config)
+        print("✓ 已清空全部修饰键动作")
+    default:
+        fail("用法：ulanzidial mod <add|list|clear> …")
+    }
 
 case "profiles":
     let config = loadConfig()
@@ -347,6 +464,12 @@ default:
       get <槽位>                 查看某个槽位
       set <槽位> <类型> <参数>    设置动作
       clear <槽位>              清除动作
+      chord add <槽位+槽位> …    两键/三键组合
+      chord list | clear        查看 / 清空组合
+      layer add <按住键> <槽位> … 按住某键时的临时映射
+      layer list | clear        查看 / 清空功能层
+      mod add <修饰键> <槽位> …  按住 ⌃⌥⇧⌘ 时的另一套动作
+      mod list | clear          查看 / 清空修饰键动作
       profiles                  列出所有配置
       use <配置名>               切换配置
       status                    查看运行状态与电量

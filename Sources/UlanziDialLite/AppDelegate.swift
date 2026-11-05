@@ -76,11 +76,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 设备事件入口：转动类直通，按键走手势判定
     private func handle(control: Control, isDown: Bool) {
         if isDown {
-            gestures.down(control)
+            router.down(control)
         } else {
-            gestures.up(control)
+            router.up(control)
         }
     }
+
+    /// 高级路由：修饰键 + 槽位 / 多键组合 / 按住当功能层
+    private lazy var router: AdvancedRouter = {
+        AdvancedRouter(
+            store: store,
+            tracker: gestures,
+            fireAction: { control, action, label in
+                guard action.kind != .none else { return }
+                logLine("ACTION \(label) -> \(action.describe)")
+                Actions.perform(action)
+            }
+        )
+    }()
 
     @objc func showSettings() {
         if let w = settingsWindow {

@@ -31,7 +31,11 @@ Ulanzi D100H 是「3 个顶键 + 4 个侧键 + 一个旋钮」的剪辑控制器
 
 - **12 个槽位**：顶部三键、四个侧键、旋钮按下、旋钮顺/逆时针、按住旋钮顺/逆时针
 - **单击 / 双击 / 长按**：同一个键最多三种手势各绑一个动作；没绑双击的键仍然按下即触发，没有额外延迟
-- **命令行**：`ulanzidial set 顶部左键 key cmd+shift+4`，改完 App 自动生效；也能 `list` / `status` / `use`
+- **两键 / 三键组合**：同时按住两个键触发另一个动作（参与组合的键会有约 220ms 判定窗口）
+- **按住当功能层**：按住某个键时，其他键临时换成另一套映射（类似 Fn）
+- **键盘修饰键 + 旋钮**：按住 ⌃⌥⇧⌘ 再转旋钮，走另一套动作，零延迟
+- 以上高级功能**默认全部关闭**——没配置就没有任何行为变化和延迟
+- **命令行**：`ulanzidial set 顶部左键 key cmd+shift+4`，改完 App 自动生效；也能 `chord` / `layer` / `mod` / `list` / `status`
 - **9 类动作**：键盘快捷键（任意组合，含被系统预留的 ⌥⌘Tab）、系统媒体键、输入文字、打开 App、
   打开网址或文件、运行 shell 命令、系统操作（锁屏/睡眠/关显示器/屏保/三种截屏/调度中心/启动台/深色切换）、多项操作、无
 - **多项操作**：按顺序执行多步动作，每步可设等待毫秒数
@@ -110,7 +114,11 @@ This project rewrites only the layer that matters, using Apple's own frameworks:
 
 - **12 slots**: three top keys, four side keys, dial press, dial rotate CW/CCW, and press-and-rotate CW/CCW
 - **Click / double-click / long-press**: up to three actions per key. Keys with no double-click binding still fire instantly — zero added latency
-- **Command line**: `ulanzidial set topLeft key cmd+shift+4`; the running app picks it up immediately. Also `list`, `status`, `use`
+- **Two- and three-key chords**: hold two keys together to fire a different action (chord keys take a ~220 ms decision window)
+- **Hold-as-layer**: while one key is held, other keys temporarily use a second mapping (like Fn)
+- **Keyboard modifier + dial**: hold ⌃⌥⇧⌘ and turn the dial for a second action, zero latency
+- All of the above are **off by default** — no configuration means no change in behaviour and no delay
+- **Command line**: `ulanzidial set topLeft key cmd+shift+4`; the running app picks it up immediately. Also `chord`, `layer`, `mod`, `list`, `status`
 - **9 action kinds**: keyboard shortcut (any combination, including system-reserved ones like ⌥⌘Tab),
   media keys, type text, open an app, open a URL or file, run a shell command, system actions
   (lock, sleep, display sleep, screensaver, three screenshot modes, Mission Control, Launchpad, dark mode),

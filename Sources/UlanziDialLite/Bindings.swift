@@ -252,6 +252,9 @@ final class BindingStore: ObservableObject {
     @Published private(set) var profiles: [String: [Control: Action]] = [:]
     @Published private(set) var doubleMap: [String: [Control: Action]] = [:]
     @Published private(set) var longMap: [String: [Control: Action]] = [:]
+    @Published private(set) var chords: [ChordSpec] = []
+    @Published private(set) var modifierActions: [ModifierSpec] = []
+    @Published private(set) var layers: [LayerSpec] = []
     @Published private(set) var activeProfile: String = "默认"
     @Published private(set) var appRules: [String: String] = [:]
 
@@ -284,6 +287,78 @@ final class BindingStore: ObservableObject {
     /// 这个键是否有单击以外的绑定（决定要不要延迟判定双击）
     func hasExtraGestures(_ c: Control) -> Bool {
         doubleBinding(c).kind != .none || longBinding(c).kind != .none
+    }
+
+    // MARK: 高级组合
+
+    func chordKeys(for c: Control) -> Set<Control> {
+        let slot = String(format: "%02x", c.rawValue)
+        var out: Set<Control> = []
+        for chord in chords where chord.keys.contains(slot) {
+            for raw in chord.keys {
+                if let v = UInt8(raw, radix: 16), let other = Control.from(id: v) { out.insert(other) }
+            }
+        }
+        return out
+    }
+
+    func isChordKey(_ c: Control) -> Bool {
+        let slot = String(format: "%02x", c.rawValue)
+        return chords.contains { $0.keys.contains(slot) }
+    }
+
+    func chord(matching held: Set<Control>) -> ChordSpec? {
+        chords.first { spec in
+            var controls: Set<Control> = []
+            for raw in spec.keys {
+                guard let v = UInt8(raw, radix: 16), let c = Control.from(id: v) else { return false }
+                controls.insert(c)
+            }
+            return controls == held
+        }
+    }
+
+    func modifierAction(control: Control, mask: UInt) -> Action? {
+        let slot = String(format: "%02x", control.rawValue)
+        return modifierActions.first { $0.control == slot && $0.mask == mask }?.action
+    }
+
+    func layer(holding control: Control) -> LayerSpec? {
+        let slot = String(format: "%02x", control.rawValue)
+        return layers.first { $0.hold == slot }
+    }
+
+    func addChord(_ spec: ChordSpec) {
+        chords.append(spec)
+        save()
+        logLine("store.addChord \(spec.describe)")
+    }
+
+    func removeChord(id: UUID) {
+        chords.removeAll { $0.id == id }
+        save()
+    }
+
+    func addModifierAction(_ spec: ModifierSpec) {
+        modifierActions.append(spec)
+        save()
+        logLine("store.addModifier \(spec.maskLabel)+\(spec.control)")
+    }
+
+    func removeModifierAction(id: UUID) {
+        modifierActions.removeAll { $0.id == id }
+        save()
+    }
+
+    func addLayer(_ spec: LayerSpec) {
+        layers.append(spec)
+        save()
+        logLine("store.addLayer hold=\(spec.hold) \(spec.bindings.count) 项")
+    }
+
+    func removeLayer(id: UUID) {
+        layers.removeAll { $0.id == id }
+        save()
     }
 
     func set(_ c: Control, gesture: ClickGesture, _ a: Action) {
@@ -403,6 +478,9 @@ final class BindingStore: ObservableObject {
             appRules = config.appRules ?? [:]
             doubleMap = BindingStore.decodeMaps(config.doubleBindings)
             longMap = BindingStore.decodeMaps(config.longBindings)
+            chords = config.chords ?? []
+            modifierActions = config.modifierActions ?? []
+            layers = config.layers ?? []
             let wanted = config.activeProfile ?? "默认"
             activeProfile = decoded[wanted] != nil ? wanted : (decoded.keys.sorted().first ?? "默认")
             logLine("config loaded: \(decoded.count) 个配置, \(appRules.count) 条应用规则, 双击 \(doubleMap.values.reduce(0) { $0 + $1.count }) 项, 长按 \(longMap.values.reduce(0) { $0 + $1.count }) 项")
@@ -429,12 +507,15 @@ final class BindingStore: ObservableObject {
             encoded[name] = BindingStore.encodeBindings(map)
         }
         let config = ConfigFile(
-            version: 3,
+            version: 4,
             activeProfile: activeProfile,
             profiles: encoded,
             appRules: appRules,
             doubleBindings: BindingStore.encodeMaps(doubleMap),
-            longBindings: BindingStore.encodeMaps(longMap)
+            longBindings: BindingStore.encodeMaps(longMap),
+            chords: chords,
+            modifierActions: modifierActions,
+            layers: layers
         )
         if let data = try? JSONEncoder().encode(config) {
             lastSelfWrite = Date()
@@ -536,4 +617,53 @@ struct ConfigFile: Codable {
     /// 双击 / 长按绑定（v3 新增，旧配置里没有这两个字段）
     var doubleBindings: [String: [String: Action]]?
     var longBindings: [String: [String: Action]]?
+    /// 高级组合（v4 新增）
+    var chords: [ChordSpec]?
+    var modifierActions: [ModifierSpec]?
+    var layers: [LayerSpec]?
+}
+
+// MARK: - 高级组合
+
+/// 两键 / 三键同时按住
+struct ChordSpec: Codable, Equatable, Identifiable {
+    var id: UUID = UUID()
+    var keys: [String]          // 槽位 ID，如 ["01", "08"]
+    var action: Action
+    var describe: String {
+        let names = keys.compactMap { raw -> String? in
+            guard let v = UInt8(raw, radix: 16), let c = Control.from(id: v) else { return nil }
+            return c.name
+        }
+        return names.joined(separator: " + ")
+    }
+}
+
+/// 按住键盘修饰键时，某个槽位改走另一套动作（零延迟）
+struct ModifierSpec: Codable, Equatable, Identifiable {
+    var id: UUID = UUID()
+    var mask: UInt              // CGEventFlags：⌃ 1<<18、⌥ 1<<19、⇧ 1<<17、⌘ 1<<20
+    var control: String
+    var action: Action
+
+    var maskLabel: String {
+        var out = ""
+        if mask & (1 << 18) != 0 { out += "⌃" }
+        if mask & (1 << 19) != 0 { out += "⌥" }
+        if mask & (1 << 17) != 0 { out += "⇧" }
+        if mask & (1 << 20) != 0 { out += "⌘" }
+        return out.isEmpty ? "（无）" : out
+    }
+}
+
+/// 按住某个键时，其他槽位临时换成另一套映射（类似 Fn 层）
+struct LayerSpec: Codable, Equatable, Identifiable {
+    var id: UUID = UUID()
+    var hold: String                    // 触发层的槽位 ID
+    var bindings: [String: Action]      // 该层下其他槽位的动作
+
+    var holdName: String {
+        guard let v = UInt8(hold, radix: 16), let c = Control.from(id: v) else { return hold }
+        return c.name
+    }
 }
