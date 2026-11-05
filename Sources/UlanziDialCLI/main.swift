@@ -113,6 +113,8 @@ func loadConfig() -> ConfigFile {
 
 func saveConfig(_ config: ConfigFile) {
     try? FileManager.default.createDirectory(at: supportDir, withIntermediateDirectories: true)
+    var config = config
+    config.version = 4
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
     guard let data = try? encoder.encode(config) else {
