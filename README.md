@@ -1,4 +1,19 @@
-# UlanziDial Native
+<!--readme-header-->
+<p align="center">
+  <img src="assets/AppIcon-1024.png" width="128" alt="UlanziDial Native icon">
+</p>
+
+<h1 align="center">UlanziDial Native</h1>
+
+<p align="center">
+  <b>Ulanzi D100H 旋钮的原生 macOS 客户端，约 1 MB</b><br>
+  <sub>Native macOS client for the Ulanzi D100H dial — ~1 MB, no Electron</sub>
+</p>
+
+<p align="center"><img alt="platform" src="https://img.shields.io/badge/platform-macOS-000000?logo=apple&logoColor=white"><img alt="license" src="https://img.shields.io/github/license/TimmySheep/ulanzidial-native?label=license&color=green"></p>
+
+---
+<!--/readme-header-->
 
 > **非官方项目。** 与 Ulanzi（深圳优篮子科技）没有任何关系，不是官方软件。本项目是个人自用的轻量替代品，
 > 不使用其商标做宣传，也不包含官方软件的任何二进制、图标或插件资源。
